@@ -1,5 +1,7 @@
 # PathSnap Technical Report — Sections 6 & 7 (Person 4)
 
+> Numbers in 6.3 regenerated with the final pipeline (tuned LightGBM + tuned HMM) by `python -m src.viz.make_report_maps`; they match `results/hmm/hmm_vs_classifier_per_trip.csv`.
+
 ---
 
 ## 6. Geographical Visualisation Using Folium
@@ -30,22 +32,22 @@ All maps were generated using the reproducible script `python -m src.viz.make_re
 
 #### Case Study 1: Standard Urban Trajectory — Trip 00000007 (`results/maps/trip_00000007_map.html`)
 - **Characteristics:** 1,354 GPS points, duration 1,353 s, urban arterial with multiple turns and intersections.
-- **Classifier-Only Accuracy:** 98.23% | Route Continuity: 93.10% (several topological disconnects at intersections).
-- **HMM Reconstructed Accuracy:** **98.38%** (+0.15%) | Route Continuity: **100.00%** (**0 disconnect breaks**).
+- **Classifier-Only Accuracy:** 93.65% | Route Continuity: 99.63% (5 breaks).
+- **HMM Reconstructed Accuracy:** **99.93%** (+6.28 pp) | Route Continuity: **100.00%** (**0 breaks**).
 - **Visual Analysis:** 
-  The raw GPS points exhibit moderate lateral scatter (3–10 m) due to urban multipath effects. While the independent classifier occasionally oscillated between opposing parallel arcs at complex intersections, the HMM transition matrix correctly penalised backward or disjoint transitions, snapping the route to a single, continuous, 100% connected polyline that perfectly tracks the ground-truth reference line.
+  The raw GPS points exhibit moderate lateral scatter (3–10 m) due to urban multipath effects. While the independent classifier occasionally oscillated between opposing parallel arcs at complex intersections, the HMM's route-distance transitions penalise direction flips and disjoint jumps, giving a single fully connected route that matches the reference on 1,353 of 1,354 points.
 
 #### Case Study 2: Long-Distance Complex Highway & Urban Arterial — Trip 00000056 (`results/maps/trip_00000056_map.html`)
 - **Characteristics:** 3,958 GPS points, duration 3,957 s, dense urban network transitioning into a multi-lane divided expressway.
-- **Classifier-Only Accuracy:** 20.41% | Route Continuity: 91.20% (140+ breaks).
-- **HMM Reconstructed Accuracy:** **20.84%** (+0.43%) | Route Continuity: **97.93%** (82 breaks).
+- **Classifier-Only Accuracy:** 90.12% | Route Continuity: 91.89% (321 breaks).
+- **HMM Reconstructed Accuracy:** **96.34%** (+6.22 pp) | Route Continuity: **96.82%** (126 breaks).
 - **Visual & Diagnostic Analysis (Challenging / Failure Case):**
-  This trip represents an extreme urban stress case where the vehicle travels along a high-density parallel arterial corridor. Because multiple physical road segments run parallel within 5–8 meters of one another, noisy GPS observations produce high emission probabilities across several adjacent arcs. While the raw classifier produces frequent erratic jumps across parallel service lanes, the HMM enforces longitudinal topological continuity (raising continuity from 91.2% to 97.9%). The remaining disconnects correspond directly to true physical GPS gaps ($\Delta t > 5$ s) and complex multi-level overpasses where candidate generation faces severe topological ambiguity.
+  This trip represents an extreme urban stress case where the vehicle travels along a high-density parallel arterial corridor. Because multiple physical road segments run parallel within 5–8 meters of one another, noisy GPS observations produce high emission probabilities across several adjacent arcs. While the raw classifier produces frequent jumps across parallel lanes, the HMM enforces continuity along the road graph (91.9% → 96.8%). All 126 remaining "breaks" are pairs of arcs joined by a directed road path of at most 300 m, i.e. the vehicle crossed one or more short arcs within one GPS interval (`results/hmm/break_analysis.csv`); none is a jump between unconnected parts of the network.
 
 #### Case Study 3: Short Trajectory with Sensor Gaps — Trip 00000052 (`results/maps/trip_00000052_map.html`)
 - **Characteristics:** 262 GPS points, duration 261 s, compact suburban route with sudden speed variations.
-- **Classifier-Only Accuracy:** 94.66% | Route Continuity: 91.57%.
-- **HMM Reconstructed Accuracy:** **95.42%** (+0.76%) | Route Continuity: **97.32%** (7 breaks).
+- **Classifier-Only Accuracy:** 96.18% | Route Continuity: 95.79% (11 breaks).
+- **HMM Reconstructed Accuracy:** **100.00%** (+3.82 pp) | Route Continuity: **96.17%** (10 multi-hop breaks, see `results/hmm/break_analysis.csv`).
 - **Visual Analysis:**
   Demonstrates the system's ability to recover rapid manoeuvres and maintain continuous routing even over short trip windows without requiring long warm-up intervals.
 

@@ -1,7 +1,7 @@
 # PathSnap Technical Report — Sections 3, 4 and 5 (Persons 2 and 3)
 
 Every number in this file is read from a CSV in `results/` produced by the scripts listed in the README
-(section 6, "Reproducing the Experiments"). Seeds are fixed (42). Nothing here was typed in by hand from memory.
+(section 6, "Reproducing the Experiments"); the file next to each table is its source. Seeds are fixed (42).
 
 **Data partitions used**
 
@@ -30,7 +30,7 @@ decodes a connected sequence from the same scores.
 | topology | `out_deg_to`, `in_deg_from`, `has_twin` | intersections vs plain road |
 | context | `prev_same_dist`, `next_same_dist`, `prev_conn_dist`, `next_conn_dist`, `progress_along`, `progress_vs_move`, `win_frac`, `win_mean_dist` | is the same / a graph-connected arc also close at t−1 and t+1, does the projection move forward along the arc, how often is the arc a candidate in a ±5-point window |
 
-On one test trip the true arcs average 7 m from the fix with heading cosine 0.84, against 49 m and −0.13 for the other candidates.
+Example (student-test trip 00000007): the true arcs average 7.3 m from the fix with a mean heading cosine of 0.84, against 48.8 m and −0.13 for the other candidates.
 
 **Protocol (`src/models/train_compare.py`).** GroupKFold(5) by trip on the 78 clean train trips (fold membership in
 `results/cv_folds.json`). Training rows: at most 800 random points per trip with all their candidates (so the longest trips
@@ -122,19 +122,21 @@ Candidate-level positives are 6.2 % of rows, so recall/precision refer to the po
 #### 3.2.6 Multi-Layer Perceptron (neural network)
 * **Why suitable.** A smooth non-linear function of all features jointly, trained directly on log loss. It is the neural-network family and has a real epoch history.
 * **Strengths / limitations.** Good calibration (log loss 0.038) at the cost of the longest training time here (249 s for a capped
-  300k-row sample, 30 epochs, early stopping). It needs scaling, and its results depend on the optimiser settings and seed.
+  300k-row sample, early-stopped at epoch 19). It needs scaling, and its results depend on the optimiser settings and seed.
 * **Hyperparameters / objective.** StandardScaler, hidden layers (128, 64), ReLU, Adam (lr 1e-3), batch 1024, ≤ 30 epochs, early stopping
   on a 10 % validation split (patience 4), 300k-row training subsample. Objective: binary cross-entropy.
 * **Results.** Top-1 0.866, macro F1 0.923, log loss 0.038 (CV top-1 0.860 ± 0.038, macro F1 0.919).
-* **Fit.** Train-fit 0.873 vs CV 0.860: a small gap. The loss curve (`models_mlp_loss_curve.png`) is still decreasing slowly when early
-  stopping / the epoch cap ends training, so it is **slightly underfitting** rather than overfitting.
+* **Fit.** Train-fit 0.873 vs CV 0.860: a small gap. In the loss curve (`models_mlp_loss_curve.png`, final model) the training loss keeps falling
+  (0.085 → 0.036) while the validation accuracy peaks at epoch 14 (0.9861) and then flattens. Early stopping therefore ended training at epoch 19,
+  before the 30-epoch cap, at the point where more epochs would start to overfit. So the network is **well fitted**, neither over- nor underfitting.
 
 #### Common observation: the per-trip spread is larger than the gap between models
 Fold-to-fold standard deviation of CV top-1 is about 0.035–0.038 for every model, larger than the gap between
 the four best models (0.860–0.869). Some trips are intrinsically harder (dense networks, long stops, parallel roads), and
 every model finds the same trips hard: fold 2 is the best fold and folds 0/1 the worst for every model (`results/model_cv_folds.csv`).
-For all models, about 13 % of the remaining errors are not separable point by point (see 5.6): the two directions of the same street at low speed, and arcs meeting at an intersection.
-This is what motivates the sequence model in Section 5.
+Even the best classifier (tuned LightGBM) is wrong on 11.8 % of student-test points. 44 % of those errors are the reverse twin
+(same street, wrong direction) and 16 % an adjacent arc at an intersection (`results/error_analysis.csv`, Section 5.6). These cases
+are hard to separate point by point, but easy to separate over a sequence. This is what motivates the HMM in Section 5.
 
 ### 3.3 Visualisations
 
@@ -146,7 +148,19 @@ This is what motivates the sequence model in Section 5.
 
 ### 3.4 Model selection
 
-<!-- SELECTION -->
+Ranked by the primary metric (CV top-1), the untuned models are: Random Forest 0.869, LightGBM 0.860, MLP 0.860, Logistic
+Regression 0.840, KNN 0.819, Gaussian NB 0.808. The four best are within one fold standard deviation (≈ 0.037) of each other, so
+CV alone does not separate RF, LightGBM and MLP. We chose **LightGBM for Bayesian optimisation** for these reasons:
+1. **It was tied for best quality before tuning.** Its CV top-1 is 0.009 below RF's, a quarter of the fold std. Its student-test top-1 is the same as RF's (0.866 vs 0.867).
+2. **Cost makes tuning feasible.** One LightGBM fit takes ~2.5 s, against ~110–150 s for RF and ~250 s for the MLP. Thirty trials of group CV cost
+   minutes for LightGBM and many hours for RF on one laptop.
+3. **It has the richest search space** (tree count, learning rate, leaves, depth, sampling, L1/L2), i.e. the most to gain from tuning.
+   Logistic regression and naive Bayes are underfitting, so tuning them cannot remove their bias.
+4. **Deployment.** The model is small and fast enough for the API.
+
+The choice was confirmed after tuning: the tuned LightGBM is the best model on every quality metric, both in CV (top-1 0.873, macro F1 0.930)
+and on student-test (top-1 0.882, macro F1 0.933, log loss 0.032). After HMM decoding it is also the best (0.963, table 3.1).
+The ranking of the models is essentially unchanged by HMM decoding (only the near-tied KNN and naive Bayes swap with RF pending, see table 3.1): a better classifier gives a better decoded route, so the classifier choice still matters even with the HMM.
 
 ---
 
@@ -226,8 +240,8 @@ straight-line distance between them. For consecutive candidates a (at t−1, fra
 
 log T(a→b) = −|d_route − d_gc| / β, where d_gc is the straight-line distance between the two GPS fixes. All pairwise route distances of a
 trip are computed once and vectorised (unique (source, target) node pairs, batched Dijkstra), so tuning β, back_mult or
-the floor only re-runs the cheap Viterbi pass. The recursion runs in log space with a (K_{t−1} × K_t) max-plus product per step.
-The longest train trip (19,313 points) decodes in about a second.
+the floor only re-runs the cheap Viterbi pass. The recursion runs in log space with a (K_{t−1} × K_t) max-plus product per step. The Viterbi pass itself costs about
+26 ms per 1,000 points on student-test (`decode_s_per_1k_points` in `results/hmm/hmm_vs_classifier_summary.csv`).
 
 ### 5.4 Missing candidates and large GPS gaps
 * **No candidates** (0.68 % of train points, 0.09 % of student-test): the chain is cut, the point gets no arc (−1, counted as
@@ -244,4 +258,73 @@ breaks in the continuity metric.
 
 ### 5.6 Did HMM decoding improve the route?
 
-<!-- SECTION_5_RESULTS -->
+**Decoder tuning (train only).** Five decoder parameters were tuned with Optuna TPE (30 trials, `results/hmm/decoder_trials.csv`,
+`results/figures/hmm_decoder_tuning.png`). The objective was top-1 over all 183,260 clean-train points, decoded from the tuned LightGBM's
+**5-fold out-of-fold** probabilities, so the emissions have the same quality as on unseen trips. Student-test was not used.
+
+| Parameter | Search range | Default | Tuned (`configs/hmm.yaml`) |
+|---|---|---|---|
+| β (transition scale, m) | log 1–100 | 10 | 5.68 |
+| w_emis (emission weight) | log 0.2–3 | 1.0 | 0.248 |
+| log_floor (no-path transition) | −40 to −5 | −20 | −36.9 |
+| back_mult (backward-on-arc cost) | log 1–20 | 4 | 1.11 |
+| gap_s (cut the chain above, s) | 10–120 | 60 | 49.6 |
+
+Train OOF top-1: classifier only 0.8532, HMM default 0.9136, HMM tuned **0.9331**. The tuned decoder trusts the road graph more
+than the classifier (w_emis 0.25: the emission enters with a quarter of its log weight) and uses a sharper transition (β 5.7 m).
+Jumps without a path are almost forbidden (floor −37). The backward penalty became almost neutral (1.11): with a sharp β, moving backwards
+along an arc is already expensive, because it makes d_route differ from d_gc.
+
+**Classifier-only vs classifier + HMM on student-test** (`results/hmm/hmm_vs_classifier_summary.csv`, 10 trips, 19,160 points):
+
+| Method | Top-1 | Top-1 (trip mean) | Continuity | Breaks / 1k pts | Edit distance | Route precision | Route recall | Route F1 |
+|---|---|---|---|---|---|---|---|---|
+| classifier only (tuned LightGBM) | 0.8820 | 0.8931 | 0.9464 | 53.6 | 0.360 | 0.841 | 0.974 | 0.901 |
+| classifier + HMM, default decoder | 0.9343 | 0.9390 | 0.9835 | 16.4 | 0.119 | 0.943 | 0.987 | 0.964 |
+| **classifier + HMM, tuned decoder** | **0.9627** | **0.9570** | **0.9835** | **16.5** | **0.077** | **0.959** | **0.989** | **0.973** |
+| distance-only HMM (no classifier) | 0.9288 | 0.9287 | 0.9817 | 18.3 | 0.121 | 0.923 | 0.981 | 0.950 |
+
+The HMM raises student-test top-1 by **+8.1 points** (0.882 → 0.963), and cuts the normalised edit distance between the collapsed
+predicted and reference arc sequences from 0.36 to 0.08. Route precision rises from 0.84 to 0.96: the classifier-only route
+contains many spurious arcs (the other direction of the street, side streets at intersections) that the HMM removes. The improvement on
+student-test (+8.1 pp) matches the train-OOF improvement (+8.0 pp, 0.853 → 0.933), so the decoder tuning did not overfit the train trips.
+
+*Ablation: does the classifier matter?* A classical HMM with a purely geometric emission (Gaussian in the point-to-arc distance,
+σ = 10 m) reaches 0.929. The classifier-driven HMM is 3.4 points better, so heading, kinematic and context features add information the
+transition model alone does not have.
+
+*Where the classifier fails and the HMM fixes it* (`results/error_analysis.csv`):
+
+| Share of all student-test points | classifier only | + HMM |
+|---|---|---|
+| wrong overall | 11.8 % | 3.7 % |
+| reverse twin (right street, wrong direction) | 5.2 % | 1.3 % |
+| adjacent arc (wrong arc at an intersection) | 1.9 % | 1.5 % |
+| other wrong arc | 4.7 % | 1.0 % |
+| error rate when speed < 2 m/s | 38.7 % | 12.5 % |
+| error rate when moving | 10.6 % | 3.4 % |
+
+The largest single error type of the classifier is the **reverse twin**. When the vehicle is slow, the GPS heading is noise and both
+directions look identical point by point. The HMM resolves most of these, because a route cannot flip direction from one second to the next
+without a long detour. Points at an intersection improve least: 1.5 % of points are still assigned the arc adjacent to the true one. Our interpretation
+(not separately measured) is that near a node the decoder can switch to the next arc a point or two early or late, because the
+projection distance is almost the same on both arcs.
+
+**Cases where the HMM did not help (or helped less)**
+* **Trip 00000063 (train, OOF)**: the only one of 78 train trips where the HMM is slightly worse (0.8278 → 0.8252). On every student-test
+  trip the HMM is better than the classifier (`hmm_vs_classifier_per_trip.csv`).
+* **Trips 00000009 and 00000065 (student-test)**: the tuned decoder is *worse than the default decoder* (0.918 → 0.903 and 0.880 →
+  0.866), although both beat the classifier. These are the two lowest-scoring test trips. A likely explanation (a hypothesis, not separately tested):
+  the tuned decoder's low emission weight makes it stick to a connected path, so where the graph offers two plausible branches
+  (parallel roads, many short arcs) it can follow the wrong one for longer before the classifier evidence pulls it back.
+  Tuning optimises the average over the train trips, not every individual trip.
+* **Remaining continuity "breaks"** (316 on student-test, `results/hmm/break_analysis.csv`): **all 316** are pairs of arcs joined by a
+  directed road path of ≤ 300 m. The vehicle crossed one or more short arcs within one GPS interval, which the strict continuity
+  metric (same or directly adjacent arc) counts as a break. None is a jump between unconnected parts of the network, so the decoded
+  route is fully connected on the road graph.
+* **Label-suspect trips 33 and 54**: top-1 only 0.108 → 0.130, because the reference route itself is up to ~130 m away from the GPS (P1's finding).
+  The HMM still makes the route more continuous (0.853 → 0.916) and raises route F1 from 0.82 to 0.89. These trips measure
+  the quality of the labels, not of the model.
+
+**Cost.** Decoding takes about 26 ms per 1,000 points on student-test, after building the lattice (route distances), which dominates
+the decoder time. See Section 7 for the end-to-end API latency.
