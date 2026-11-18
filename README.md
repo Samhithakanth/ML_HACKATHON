@@ -180,6 +180,8 @@ python -m src.viz.make_report_maps      # 7. Folium maps for the report -> resul
 python notebooks/make_models_nb.py      # 8. builds + executes notebooks/02_models.ipynb (walk-through of all P2/P3 results)
 pytest tests/test_models_hmm.py         # 9. unit tests: metrics, features, HMM decoder on synthetic networks (no data needed)
 pytest tests/test_api.py                # 10. API contract tests on all 10 student-test trips (needs: pip install httpx2)
+python -m src.viz.static_route_plot 00000077      # static route figures for the PDF (also: 00000007 full)
+python report/build_report.py           # 11. assembles the consolidated PDF -> report/PathSnap_Report.pdf
 ```
 
 Seeds are fixed (`SEED = 42`); trips 33 and 54 (label-suspect, see `person1/docs/DATA_NOTES.md`) are excluded from training
@@ -205,7 +207,7 @@ Logs of every run are in `results/logs/`.
 | **Tuned LightGBM + HMM/Viterbi (served by the API)** | **0.9627** | **0.9835** | **0.973** | `results/hmm/hmm_vs_classifier_summary.csv` |
 
 End-to-end API latency: 0.10–1.50 s per trip, mean 0.68 s (`results/api_latency.csv`, `python -m api.benchmark`).
-Full write-up with all models, the tuning log and the HMM analysis: `report/REPORT_SECTIONS_3_4_5.md`.
+Full report: `report/PathSnap_Report.pdf` (sources: `report/*.md`, rebuilt with `python report/build_report.py`).
 
 ---
 

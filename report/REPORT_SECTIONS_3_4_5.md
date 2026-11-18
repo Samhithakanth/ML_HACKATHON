@@ -160,6 +160,14 @@ are hard to separate point by point, but easy to separate over a sequence. This 
 * `results/figures/models_mlp_loss_curve.png`: MLP training loss and validation accuracy per epoch. This is the only model
   with an epoch history; no curves are drawn for the other models.
 
+![Figure 3.1: CV (train, 5 folds, error bar = fold std) vs student-test, for top-1, macro F1 and log loss](../results/figures/models_comparison.png)
+
+![Figure 3.2: Top-1 on training rows vs CV vs student-test (over/underfitting check)](../results/figures/models_train_cv_test.png)
+
+![Figure 3.3: Student-test candidate-level confusion matrices at threshold 0.5](../results/figures/models_confusion_matrices.png)
+
+![Figure 3.4: MLP training history (final model); early stopping at epoch 19](../results/figures/models_mlp_loss_curve.png)
+
 ### 3.4 Model selection
 
 Ranked by the primary metric (CV top-1), the untuned models are: Random Forest 0.869, LightGBM 0.860, MLP 0.860, Logistic
@@ -221,6 +229,10 @@ max_depth = 14 alone raised the log loss from 0.0448 to 0.0523, so the default (
 the "untuned" starting point would have been worse than the real default.
 
 **5. Best values.** See the table above.
+
+![Figure 4.1: Optimisation history (3-fold CV log loss per trial, red = best so far)](../results/figures/tuning_history.png)
+
+![Figure 4.2: Hyperparameter importance (fANOVA)](../results/figures/tuning_importance.png)
 
 **6. Untuned vs tuned** (same features, same training rows, same 5 CV folds, same student-test set):
 
@@ -324,6 +336,12 @@ The HMM raises student-test top-1 by **+8.1 points** (0.882 → 0.963), and cuts
 predicted and reference arc sequences from 0.36 to 0.08. Route precision rises from 0.84 to 0.96: the classifier-only route
 contains many spurious arcs (the other direction of the street, side streets at intersections) that the HMM removes. The improvement on
 student-test (+8.1 pp) matches the train-OOF improvement (+8.0 pp, 0.853 → 0.933), so the decoder tuning did not overfit the train trips.
+
+![Figure 5.1: Student-test top-1 per trip: classifier only vs HMM vs distance-only HMM](../results/figures/hmm_vs_classifier_top1.png)
+
+![Figure 5.2: Student-test route continuity per trip](../results/figures/hmm_vs_classifier_continuity.png)
+
+![Figure 5.3: Trip 00000077, the trip with the largest gain (0.759 to 0.953). Static rendering of the Folium layers (src/viz/static_route_plot.py): in the car park with parallel lanes the classifier-only route (red dashes) jumps to a lane that was not driven; the HMM route (orange) follows the reference (green).](../results/figures/route_trip_00000077.png)
 
 *Ablation: does the classifier matter?* A classical HMM with a purely geometric emission (Gaussian in the point-to-arc distance,
 σ = 10 m) reaches 0.929. The classifier-driven HMM is 3.4 points better, so heading, kinematic and context features add information the

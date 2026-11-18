@@ -198,8 +198,12 @@ def plots(S):
 
     # confusion matrices (student-test, candidate level, threshold 0.5)
     n = len(S)
-    fig, ax = plt.subplots(1, n, figsize=(3.2 * n, 3.2))
-    for a, (_, r) in zip(np.atleast_1d(ax), S.iterrows()):
+    ncol = 3
+    nrow = int(np.ceil(n / ncol))
+    fig, ax = plt.subplots(nrow, ncol, figsize=(3.4 * ncol, 3.2 * nrow))
+    for a in np.atleast_1d(ax).ravel()[n:]:
+        a.axis("off")
+    for a, (_, r) in zip(np.atleast_1d(ax).ravel(), S.iterrows()):
         cm = np.array([[r.tn, r.fp], [r.fn, r.tp]])
         a.imshow(cm / cm.sum(axis=1, keepdims=True), cmap="Blues", vmin=0, vmax=1)
         for i in range(2):
@@ -227,7 +231,7 @@ def plots(S):
         a.plot(d.epoch, d.train_loss, label="training log loss"); a.set_xlabel("epoch"); a.set_ylabel("log loss")
         b = a.twinx(); b.plot(d.epoch, d.val_score, color="C1", label="validation accuracy (10% hold-out)")
         b.set_ylabel("validation accuracy"); a.set_title("MLP training history")
-        fig.legend(loc="upper right", fontsize=8); fig.tight_layout(); fig.savefig(FIG / "models_mlp_loss_curve.png", dpi=150)
+        fig.legend(loc="center right", bbox_to_anchor=(0.86, 0.55), fontsize=8); fig.tight_layout(); fig.savefig(FIG / "models_mlp_loss_curve.png", dpi=150)
         plt.close(fig)
 
 

@@ -155,14 +155,19 @@ def main(n_trials=30):
     plots(study)
 
 
-def plots(study):
-    t = study.trials_dataframe()
+def plot_history():
+    """Optimisation history from the saved trial log (results/tuning/optuna_trials.csv)."""
+    t = pd.read_csv(OUT / "optuna_trials.csv")
     t = t[t.state == "COMPLETE"]
     fig, ax = plt.subplots(figsize=(7, 4))
     ax.scatter(t.number, t.value, s=18, label="trial (CV log loss)")
     ax.plot(t.number, t.value.cummin(), color="C3", label="best so far")
-    ax.set_xlabel("trial"); ax.set_ylabel("5-fold group-CV log loss"); ax.set_title("Optuna TPE optimisation history")
+    ax.set_xlabel("trial"); ax.set_ylabel(f"{SEARCH_FOLDS}-fold group-CV log loss"); ax.set_title("Optuna TPE optimisation history")
     ax.legend(); ax.grid(alpha=.3); fig.tight_layout(); fig.savefig(FIG / "tuning_history.png", dpi=150); plt.close(fig)
+
+
+def plots(study):
+    plot_history()
     try:
         imp = optuna.importance.get_param_importances(study)
         fig, ax = plt.subplots(figsize=(6, 4))
