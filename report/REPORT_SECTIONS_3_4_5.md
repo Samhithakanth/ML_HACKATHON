@@ -8,7 +8,7 @@ Every number in this file is read from a CSV in `results/` produced by the scrip
 | Partition | Use |
 |---|---|
 | train, 78 clean trips | model fitting, 5-fold GroupKFold cross-validation by `trip_id`, Bayesian optimisation, HMM decoder tuning |
-| train, trips 33 and 54 | excluded from fitting and selection (reference route drifts ~130 m from the GPS, see `person1/docs/DATA_NOTES.md`); reported separately |
+| train, trips 33 and 54 | excluded from fitting and selection (reference route drifts ~130 m from the GPS, see `docs/P1_DATA_NOTES.md`); reported separately |
 | student_test, 10 trips | final reporting only; never used for any model, hyperparameter or decoder choice |
 | evaluator (hidden) | never read by any script |
 

@@ -177,7 +177,7 @@ python -m src.viz.make_report_maps      # 7. Folium maps for the report -> resul
 pytest tests/                           # 8. API contract tests on all 10 student-test trips
 ```
 
-Seeds are fixed (`SEED = 42`); trips 33 and 54 (label-suspect, see `person1/docs/DATA_NOTES.md`) are excluded from training
+Seeds are fixed (`SEED = 42`); trips 33 and 54 (label-suspect, see `docs/P1_DATA_NOTES.md`) are excluded from training
 and model selection and reported separately. The evaluator partition is never read by any script.
 Logs of every run are in `results/logs/`.
 

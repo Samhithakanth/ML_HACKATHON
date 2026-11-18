@@ -12,7 +12,7 @@ def _line(trip, arc_ids):
     return [[(n.lat.values[f], n.lon.values[f]), (n.lat.values[t], n.lon.values[t])] for f, t in zip(a.from_node, a.to_node)]
 
 
-def make_map(trip, predicted_arcs=None, point_slice=None, network_radius_m=150, show_candidates_for=None, out=None):
+def make_map(trip, predicted_arcs=None, point_slice=None, network_radius_m=150, show_candidates_for=None, fit_route_bounds=False, out=None):
     """predicted_arcs: ordered arc_ids (None until the model exists). point_slice limits the extent for readability."""
     tr = trip.track if point_slice is None else trip.track.iloc[point_slice]
     m = folium.Map(location=[tr.lat.mean(), tr.lon.mean()], zoom_start=15, tiles="OpenStreetMap")
@@ -29,11 +29,12 @@ def make_map(trip, predicted_arcs=None, point_slice=None, network_radius_m=150, 
     from src.data.p1_labels import align_to_route
     j, arc, _ = align_to_route(trip)
     ids = pd.unique(arc[tr.index.values]) if point_slice is not None else trip.route
-    for seg in _line(trip, ids): folium.PolyLine(seg, color="#1a9850", weight=5, opacity=0.9).add_to(ref)
+    ref_segs = _line(trip, ids)
+    for seg in ref_segs: folium.PolyLine(seg, color="#1a9850", weight=6, opacity=0.9).add_to(ref)
     ref.add_to(m)
     gp = folium.FeatureGroup("GPS observations", show=True)
     for i, r in tr.iterrows():
-        folium.CircleMarker((r.lat, r.lon), radius=3, color="#2166ac", fill=True, fill_opacity=0.8, weight=1,
+        folium.CircleMarker((r.lat, r.lon), radius=3, color="#2166ac", fill=True, fill_opacity=0.9, weight=1,
                             tooltip=f"idx {i}  t={r.t:.0f}s").add_to(gp)
     gp.add_to(m)
     if predicted_arcs is not None:
@@ -50,14 +51,17 @@ def make_map(trip, predicted_arcs=None, point_slice=None, network_radius_m=150, 
     <span style="color:#d73027">&#9644;</span> Predicted route<br><span style="color:#fc8d59">&#9644;</span> Candidate arcs<br><span style="color:#888">&#9644;</span> Road network</div>""" % trip.trip_id
     m.get_root().html.add_child(folium.Element(legend))
     folium.LayerControl(collapsed=False).add_to(m)
-    lo, hi = tr.lat.min(), tr.lat.max(); m.fit_bounds([[lo, tr.lon.min()], [hi, tr.lon.max()]])
+    extra = ref_segs if fit_route_bounds else []   # long arcs (motorways) would otherwise zoom the map far out
+    lats = list(tr.lat) + [pt[0] for seg in extra for pt in seg]
+    lons = list(tr.lon) + [pt[1] for seg in extra for pt in seg]
+    m.fit_bounds([[min(lats), min(lons)], [max(lats), max(lons)]])
     if out: Path(out).parent.mkdir(parents=True, exist_ok=True); m.save(out)
     return m
 
 
 if __name__ == "__main__":
     t = load_trip("00000001", "train")
-    make_map(t, point_slice=slice(0, 300), show_candidates_for=150, out=ROOT / "results/maps/eda_train_00000001.html")
+    make_map(t, point_slice=slice(125, 140), show_candidates_for=132, out=ROOT / "results/maps/eda_train_00000001.html")
     s = load_trip("00000033", "train")
-    make_map(s, point_slice=slice(2500, 2800), out=ROOT / "results/maps/eda_train_00000033_drift.html")
+    make_map(s, point_slice=slice(2500, 2560), fit_route_bounds=True, out=ROOT / "results/maps/eda_train_00000033_drift.html")
     print("maps written")

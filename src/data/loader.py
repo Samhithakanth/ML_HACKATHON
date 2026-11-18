@@ -92,7 +92,7 @@ def get_metric_scale(mean_lat: float) -> np.ndarray:
 # ---------------------------------------------------------------------------
 # Person 1 loader (shared by training, evaluation and the API).
 # Each trip is projected into its own local azimuthal-equidistant CRS (metres),
-# because trips are spread all over the world (see person1/docs/DATA_NOTES.md).
+# because trips are spread all over the world (see docs/P1_DATA_NOTES.md).
 # ---------------------------------------------------------------------------
 import os
 from dataclasses import dataclass

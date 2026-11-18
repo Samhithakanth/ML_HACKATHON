@@ -57,7 +57,7 @@ def generate_candidates(
 # ---------------------------------------------------------------------------
 # Person 1 candidate generation (used for training, evaluation and the API):
 # all arcs within R = 100 m of each GPS point, capped at the K = 30 nearest.
-# Chosen from a train-only miss-rate sweep (person1/docs/DATA_NOTES.md).
+# Chosen from a train-only miss-rate sweep (docs/P1_DATA_NOTES.md).
 # ---------------------------------------------------------------------------
 import pandas as pd
 import shapely
