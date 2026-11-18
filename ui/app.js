@@ -6,7 +6,11 @@
 
 // Application State
 const state = {
-  apiBaseUrl: localStorage.getItem('pathsnap_api_url') || 'http://localhost:8000',
+  // When this page is served by the API itself (http://<laptop1>:8000/web/), always talk to that same server.
+  // A saved address from an earlier attempt (e.g. localhost) must not override it.
+  apiBaseUrl: window.location.pathname.startsWith('/web')
+    ? window.location.origin
+    : (localStorage.getItem('pathsnap_api_url') || 'http://localhost:8000'),
   trips: [],
   selectedTripId: null,
   currentTripData: null,
@@ -77,9 +81,9 @@ function initMap() {
   }).setView([56.25, 54.96], 13);
 
   // High contrast basemap suitable for GPS & road networks
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap &copy; CARTO',
-    subdomains: 'abcd',
+  // (CARTO's free raster tiles now return an "API KEY REQUIRED" watermark, so use OpenStreetMap's standard tiles)
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19
   }).addTo(map);
 
