@@ -1,6 +1,12 @@
 hmm:
-  stay_log_trans: -0.1
-  connected_log_trans: -0.3
-  disconnected_log_trans: -6.0
-  min_emission_prob: 1.0e-5
-  gap_split_threshold_s: 5.0
+  beta: 5.6801726523799365
+  w_emis: 0.24755938206753822
+  log_floor: -36.93292873658115
+  back_mult: 1.108433717409622
+  min_prob: 1.0e-06
+  gap_s: 49.62353728862225
+tuned_on: 78 clean train trips, 5-fold out-of-fold LightGBM-tuned probabilities
+objective: observation-level top-1
+train_oof_top1_classifier_only: 0.8532
+train_oof_top1_hmm_default: 0.9136
+train_oof_top1_hmm_tuned: 0.9331

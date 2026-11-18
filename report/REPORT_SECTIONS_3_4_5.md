@@ -133,8 +133,9 @@ Candidate-level positives are 6.2 % of rows, so recall/precision refer to the po
 Fold-to-fold standard deviation of CV top-1 is about 0.035–0.038 for every model, larger than the gap between
 the four best models (0.860–0.869). Some trips are intrinsically harder (dense networks, long stops, parallel roads), and
 every model finds the same trips hard: fold 2 is the best fold and folds 0/1 the worst for every model (`results/model_cv_folds.csv`).
-For all models, about 13 % of the remaining errors are not separable point by point (see 5.6): the two directions of the same street at low speed, and arcs meeting at an intersection.
-This is what motivates the sequence model in Section 5.
+Even the best classifier (tuned LightGBM) is wrong on 11.8 % of student-test points. 44 % of those errors are the reverse twin
+(same street, wrong direction) and 16 % an adjacent arc at an intersection (`results/error_analysis.csv`, Section 5.6). These cases
+are hard to separate point by point, but easy to separate over a sequence. This is what motivates the HMM in Section 5.
 
 ### 3.3 Visualisations
 
@@ -244,4 +245,71 @@ breaks in the continuity metric.
 
 ### 5.6 Did HMM decoding improve the route?
 
-<!-- SECTION_5_RESULTS -->
+**Decoder tuning (train only).** Five decoder parameters were tuned with Optuna TPE (30 trials, `results/hmm/decoder_trials.csv`,
+`results/figures/hmm_decoder_tuning.png`). The objective was top-1 over all 183,260 clean-train points, decoded from the tuned LightGBM's
+**5-fold out-of-fold** probabilities, so the emissions have the same quality as on unseen trips. Student-test was not used.
+
+| Parameter | Search range | Default | Tuned (`configs/hmm.yaml`) |
+|---|---|---|---|
+| β (transition scale, m) | log 1–100 | 10 | 5.68 |
+| w_emis (emission weight) | log 0.2–3 | 1.0 | 0.248 |
+| log_floor (no-path transition) | −40 to −5 | −20 | −36.9 |
+| back_mult (backward-on-arc cost) | log 1–20 | 4 | 1.11 |
+| gap_s (cut the chain above, s) | 10–120 | 60 | 49.6 |
+
+Train OOF top-1: classifier only 0.8532, HMM default 0.9136, HMM tuned **0.9331**. The tuned decoder trusts the road graph more
+than the classifier (w_emis 0.25: the emission enters with a quarter of its log weight) and uses a sharper transition (β 5.7 m).
+Jumps without a path are almost forbidden (floor −37). The backward penalty became almost neutral (1.11): with a sharp β, moving backwards
+along an arc is already expensive, because it makes d_route differ from d_gc.
+
+**Classifier-only vs classifier + HMM on student-test** (`results/hmm/hmm_vs_classifier_summary.csv`, 10 trips, 19,160 points):
+
+| Method | Top-1 | Top-1 (trip mean) | Continuity | Breaks / 1k pts | Edit distance | Route precision | Route recall | Route F1 |
+|---|---|---|---|---|---|---|---|---|
+| classifier only (tuned LightGBM) | 0.8820 | 0.8931 | 0.9464 | 53.6 | 0.360 | 0.841 | 0.974 | 0.901 |
+| classifier + HMM, default decoder | 0.9343 | 0.9390 | 0.9835 | 16.4 | 0.119 | 0.943 | 0.987 | 0.964 |
+| **classifier + HMM, tuned decoder** | **0.9627** | **0.9570** | **0.9835** | **16.5** | **0.077** | **0.959** | **0.989** | **0.973** |
+| distance-only HMM (no classifier) | 0.9288 | 0.9287 | 0.9817 | 18.3 | 0.121 | 0.923 | 0.981 | 0.950 |
+
+The HMM raises student-test top-1 by **+8.1 points** (0.882 → 0.963), and cuts the normalised edit distance between the collapsed
+predicted and reference arc sequences from 0.36 to 0.08. Route precision rises from 0.84 to 0.96: the classifier-only route
+contains many spurious arcs (the other direction of the street, side streets at intersections) that the HMM removes. The improvement on
+student-test (+8.1 pp) matches the train-OOF improvement (+8.0 pp, 0.853 → 0.933), so the decoder tuning did not overfit the train trips.
+
+*Ablation: does the classifier matter?* A classical HMM with a purely geometric emission (Gaussian in the point-to-arc distance,
+σ = 10 m) reaches 0.929. The classifier-driven HMM is 3.4 points better, so heading, kinematic and context features add information the
+transition model alone does not have.
+
+*Where the classifier fails and the HMM fixes it* (`results/error_analysis.csv`):
+
+| Share of all student-test points | classifier only | + HMM |
+|---|---|---|
+| wrong overall | 11.8 % | 3.7 % |
+| reverse twin (right street, wrong direction) | 5.2 % | 1.3 % |
+| adjacent arc (wrong arc at an intersection) | 1.9 % | 1.5 % |
+| other wrong arc | 4.7 % | 1.0 % |
+| error rate when speed < 2 m/s | 38.7 % | 12.5 % |
+| error rate when moving | 10.6 % | 3.4 % |
+
+The largest single error type of the classifier is the **reverse twin**. When the vehicle is slow, the GPS heading is noise and both
+directions look identical point by point. The HMM resolves most of these, because a route cannot flip direction from one second to the next
+without a long detour. Points at an intersection remain the hardest: 1.5 % of points are still the arc adjacent to the true one.
+Usually the decoder switches to the next arc a few points too early or too late.
+
+**Cases where the HMM did not help (or helped less)**
+* **Trip 00000063 (train, OOF)**: the only one of 78 train trips where the HMM is slightly worse (0.8278 → 0.8252). On every student-test
+  trip the HMM is better than the classifier (`hmm_vs_classifier_per_trip.csv`).
+* **Trips 00000009 and 00000065 (student-test)**: the tuned decoder is *worse than the default decoder* (0.918 → 0.903 and 0.880 →
+  0.866), although both beat the classifier. These are the two lowest-scoring test trips. The tuned decoder's low emission weight makes it
+  stick to a connected path; where the classifier is right and the graph path is ambiguous (parallel roads, short arcs), this
+  follows the wrong branch for longer. Tuning optimises the average over trips, not every trip.
+* **Remaining continuity "breaks"** (316 on student-test, `results/hmm/break_analysis.csv`): **all 316** are pairs of arcs joined by a
+  directed road path of ≤ 300 m. The vehicle crossed one or more short arcs within one GPS interval, which the strict continuity
+  metric (same or directly adjacent arc) counts as a break. None is a jump between unconnected parts of the network, so the decoded
+  route is fully connected on the road graph.
+* **Label-suspect trips 33 and 54**: top-1 only 0.108 → 0.130, because the reference route itself is up to ~130 m away from the GPS (P1's finding).
+  The HMM still makes the route more continuous (0.853 → 0.916) and raises route F1 from 0.82 to 0.89. These trips measure
+  the quality of the labels, not of the model.
+
+**Cost.** Decoding takes about 26 ms per 1,000 points on student-test, after building the lattice (route distances), which dominates
+the decoder time. See Section 7 for the end-to-end API latency.
