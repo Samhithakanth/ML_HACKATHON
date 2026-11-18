@@ -52,3 +52,39 @@ def generate_candidates(
         candidates_per_point.append([int(c) for c in cands])
 
     return candidates_per_point
+
+
+# ---------------------------------------------------------------------------
+# Person 1 candidate generation (used for training, evaluation and the API):
+# all arcs within R = 100 m of each GPS point, capped at the K = 30 nearest.
+# Chosen from a train-only miss-rate sweep (person1/docs/DATA_NOTES.md).
+# ---------------------------------------------------------------------------
+import pandas as pd
+import shapely
+from shapely import STRtree
+
+CAND_RADIUS_M = 100.0
+CAND_MAX_K = 30
+
+
+def candidate_table(trip, radius: float = CAND_RADIUS_M, max_k: int = CAND_MAX_K) -> pd.DataFrame:
+    """DataFrame(point_idx, arc_id, dist_m, frac, rank); frac = projection position along the arc in [0, 1]."""
+    xy = trip.nodes[["x", "y"]].values
+    a = xy[trip.arcs.from_node.values]
+    b = xy[trip.arcs.to_node.values]
+    tree = STRtree(shapely.linestrings(np.stack([a, b], axis=1)))
+    pts = shapely.points(trip.track[["x", "y"]].values)
+    pi, ai = tree.query(pts, predicate="dwithin", distance=radius)
+    px = trip.track.x.values[pi]; py = trip.track.y.values[pi]
+    ax, ay, bx, by = a[ai, 0], a[ai, 1], b[ai, 0], b[ai, 1]
+    dx, dy = bx - ax, by - ay
+    l2 = dx * dx + dy * dy
+    frac = np.clip(np.where(l2 > 0, ((px - ax) * dx + (py - ay) * dy) / np.where(l2 > 0, l2, 1), 0.0), 0, 1)
+    dist = np.hypot(px - (ax + frac * dx), py - (ay + frac * dy))
+    df = pd.DataFrame({"point_idx": pi.astype(np.int32), "arc_id": ai.astype(np.int32),
+                       "dist_m": dist.astype(np.float32), "frac": frac.astype(np.float32)})
+    df = df.sort_values(["point_idx", "dist_m"], kind="stable").reset_index(drop=True)
+    df["rank"] = df.groupby("point_idx").cumcount().astype(np.int16)
+    if max_k is not None:
+        df = df[df["rank"] < max_k].reset_index(drop=True)
+    return df

@@ -1,6 +1,0 @@
-Model,Algorithm Family,Key Configuration,CV Macro F1-score,Top-1 Accuracy,Route continuity,Student-Test Macro F1-score,Precision,Recall,Log Loss,Inference Time,Training Time
-Logistic Regression,Linear & Probabilistic,"C=1.0, solver='lbfgs', max_iter=500",0.6477,0.538,0.795,0.6457,0.697,0.2098,0.1838,36 ms,1.49 s
-K-Nearest Neighbors,Instance-Based,"k=11, weights='distance', metric='euclidean'",0.8417,0.5854,0.8453,0.7795,0.5489,0.6406,0.6017,117741 ms,2.86 s
-Random Forest,Ensemble (Bagging),"n_estimators=100, max_depth=12, n_jobs=-1",0.8991,0.6527,0.9141,0.8313,0.633,0.7523,0.1122,599 ms,27.48 s
-LightGBM,Gradient Boosting,"n_estimators=150, lr=0.08, num_leaves=31",0.8974,0.6261,0.8619,0.8262,0.6039,0.776,0.2314,548 ms,1.80 s
-MLP Classifier,Neural Networks,"layers=(64, 32), act='relu', early_stopping=True",0.8889,0.6407,0.9073,0.8284,0.6274,0.7475,0.1344,207 ms,103.36 s

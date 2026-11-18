@@ -37,7 +37,8 @@ from api.schemas import (
 )
 from api.pipeline import predict_trip
 from src.data.loader import get_available_trips, load_trip_raw, get_metric_scale
-from src.data.labels import align_to_route
+from src.data.loader import load_trip
+from src.data.labels import align_trip_to_route
 from src.models.predictor import PathSnapPredictor
 from src.hmm.viterbi import build_route_polylines
 from src.eval.metrics import (
@@ -89,7 +90,7 @@ SERVER_STATE: Dict[str, Any] = {
     "predictor": None,
     "available_trips": [],
     "trip_ids": set(),
-    "reference_labels": {},     # STRICTLY SERVER-SIDE: trip_id -> List[int]
+    "reference_labels": {},     # STRICTLY SERVER-SIDE: trip_id -> np.ndarray of reference arc per point
     "cached_raw": {},            # trip_id -> (track, nodes, arcs)
     "hmm_config": {}
 }
@@ -140,13 +141,10 @@ async def lifespan(app: FastAPI):
             )
             SERVER_STATE["cached_raw"][tid] = (track, nodes, arcs)
 
-            # Build server-side reference alignment if .route exists
+            # Build server-side reference labels (same monotone-DP alignment as training) if .route exists
             if route is not None:
-                mean_lat = float(np.mean(track[:, 1]))
-                scale = get_metric_scale(mean_lat)
-                track_m = track[:, :2] * scale
-                nodes_m = nodes * scale
-                ref_labels = align_to_route(track_m, nodes_m, arcs, route)
+                trip = load_trip(tid, config.eval_partition, raw_dir=config.data_dir, load_route=True)
+                _, ref_labels, _ = align_trip_to_route(trip)
                 SERVER_STATE["reference_labels"][tid] = ref_labels
                 log.info(f"Cached {len(ref_labels)} server-side reference labels for trip {tid}")
         except Exception as e:
@@ -385,8 +383,6 @@ def predict(req: PredictRequest, request: Request):
         partition=config.eval_partition,
         predictor=SERVER_STATE["predictor"],
         hmm_config=SERVER_STATE["hmm_config"],
-        spatial_k=config.pipeline["spatial_search_k"],
-        max_candidates=config.pipeline["max_candidates"],
         use_stub=config.pipeline.get("use_stub", False)
     )
 
@@ -424,29 +420,30 @@ def predict(req: PredictRequest, request: Request):
     )
 
     # Server-side scoring against private reference labels
-    ref_labels = SERVER_STATE["reference_labels"].get(trip_id, [])
-    if ref_labels and len(ref_labels) == len(hmm_arcs):
+    ref_labels = SERVER_STATE["reference_labels"].get(trip_id)
+    if ref_labels is not None and len(ref_labels) == len(hmm_arcs):
         hmm_acc = compute_top1_accuracy(hmm_arcs, ref_labels)
         clf_acc = compute_top1_accuracy(clf_arcs, ref_labels)
         hmm_f1 = compute_macro_f1(hmm_arcs, ref_labels)
         clf_f1 = compute_macro_f1(clf_arcs, ref_labels)
         point_correct = compute_point_correctness(hmm_arcs, ref_labels)
     else:
-        # If no reference labels exist for trip (unlabelled hidden test trip)
-        hmm_acc = 1.0
-        clf_acc = 0.9
-        hmm_f1 = 1.0
-        clf_f1 = 0.9
-        point_correct = [True] * len(hmm_arcs)
+        # No reference route on the server for this trip: accuracy cannot be computed -> null (never invented)
+        hmm_acc = clf_acc = hmm_f1 = clf_f1 = None
+        point_correct = []
+        warnings_list.append("No reference route available on the server: accuracy metrics are null")
 
     continuity, n_breaks = compute_route_continuity(hmm_arcs, arcs)
+    clf_continuity, _ = compute_route_continuity(clf_arcs, arcs)
+    r4 = lambda v: None if v is None else round(float(v), 4)
 
     metrics_obj = Metrics(
-        hmm_pointwise_accuracy=round(float(hmm_acc), 4),
-        classifier_only_pointwise_accuracy=round(float(clf_acc), 4),
+        hmm_pointwise_accuracy=r4(hmm_acc),
+        classifier_only_pointwise_accuracy=r4(clf_acc),
         route_continuity=round(float(continuity), 4),
-        hmm_macro_f1=round(float(hmm_f1), 4),
-        classifier_only_macro_f1=round(float(clf_f1), 4),
+        classifier_only_route_continuity=round(float(clf_continuity), 4),
+        hmm_macro_f1=r4(hmm_f1),
+        classifier_only_macro_f1=r4(clf_f1),
         n_disconnected_breaks=int(n_breaks),
         inference_time_ms=int(result["timings_ms"]["total"])
     )

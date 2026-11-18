@@ -47,11 +47,13 @@ class RoutePath(BaseModel):
 
 
 class Metrics(BaseModel):
-    hmm_pointwise_accuracy: float
-    classifier_only_pointwise_accuracy: float
+    # accuracy metrics are null when the server has no reference route for the trip
+    hmm_pointwise_accuracy: Optional[float] = None
+    classifier_only_pointwise_accuracy: Optional[float] = None
     route_continuity: float
-    hmm_macro_f1: float
-    classifier_only_macro_f1: float
+    classifier_only_route_continuity: Optional[float] = None
+    hmm_macro_f1: Optional[float] = None
+    classifier_only_macro_f1: Optional[float] = None
     n_disconnected_breaks: int
     inference_time_ms: int
 
