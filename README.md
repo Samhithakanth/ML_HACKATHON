@@ -25,8 +25,8 @@ The system is partitioned strictly across two physical machines to prevent evalu
 ├──────────────────────────────────────────────┤                            ├──────────────────────────────────────────────┤
 │ • FastAPI Backend (`api/main.py`)            │                            │ • Streamlit Dashboard (`ui/app.py`)          │
 │ • Trained LightGBM Model (`models/`)         │                            │ • Zero local models / zero ground-truth data │
-│ • Spatial KD-Tree Candidate Indexing         │                            │ • Selects trip from 10 evaluation options    │
-│ • 10-Feature Kinematic & Topological Extr.   │                            │ • Sends Trip ID ONLY to Laptop 1             │
+│ • STRtree candidates (R=100 m, K=30)         │                            │ • Selects trip from 10 evaluation options    │
+│ • 31-feature geometric/heading/context set   │                            │ • Sends Trip ID ONLY to Laptop 1             │
 │ • HMM & Viterbi Sequential Decoder           │                            │ • Renders 5-layer interactive Folium map     │
 │ • Private Server-Side Ground-Truth Alignment │                            │ • Displays real-time metrics & warnings      │
 │ • Real-time stdout & `logs/api.log` logging  │                            │ • Optional zero-install Web UI (`/web/`)     │
@@ -50,10 +50,8 @@ The system is partitioned strictly across two physical machines to prevent evalu
 ├── docs/                       # Project documentation & guidelines
 │   ├── DATA_NOTES.md           # Coordinate orders, metric projection, and alignment notes
 │   └── DEPLOYMENT_GUIDE.md     # Step-by-step two-laptop setup & firewall instructions
-├── experiments/                # Person 2 & 3: Multi-model training & Bayesian tuning
-│   └── pipeline.py             # 5-model training, Optuna optimization, and HMM evaluation
 ├── models/                     # Saved model artifacts & scalers
-│   ├── lightgbm_tuned_v1.joblib # Winning tuned LightGBM model (1.2 MB)
+│   ├── lightgbm_tuned.joblib   # Final Bayesian-tuned LightGBM (served by the API)
 │   ├── lightgbm.joblib         # Untuned baseline LightGBM
 │   ├── random_forest.joblib    # Random Forest ensemble baseline
 │   ├── mlp_classifier.joblib   # Multi-Layer Perceptron neural baseline
@@ -68,7 +66,7 @@ The system is partitioned strictly across two physical machines to prevent evalu
 ├── src/                        # Modular source code
 │   ├── data/                   # P1: Loaders, candidate indexing, and server-side labels
 │   ├── eval/                   # P3/P4: Shared metrics (Top-1, Macro F1, Route Continuity)
-│   ├── features/               # P2: 10-feature geometric/kinematic extractor
+│   ├── features/               # P2: 31-feature extractor (build.py) + dataset builder (dataset.py)
 │   ├── hmm/                    # P3: Viterbi decoding & polyline path builder
 │   ├── models/                 # P2: PathSnapPredictor inference wrapper
 │   ├── tuning/                 # P3: Optuna Bayesian hyperparameter optimization
@@ -132,7 +130,7 @@ $env:UI_API_URL="http://<LAPTOP1_IP>:8000"      # Windows PowerShell
 streamlit run ui/app.py
 ```
 - Open your browser at `http://localhost:8501`.
-- Verify the green status badge: `● Connected (lightgbm_tuned_v1)`.
+- Verify the green status badge: `● Connected (lightgbm_tuned)`.
 - Select any of the 10 evaluation trips from the dropdown.
 - Click **"🚀 Run Map-Matching & Reconstruct"**.
 - The UI renders the raw GPS points, road network, and reconstructed HMM route on Folium alongside exact performance metrics.
@@ -164,42 +162,36 @@ pytest tests/test_api.py -v
 
 ---
 
-## 6. Reproducing Offline Experiments & Maps
+## 6. Reproducing the Experiments (Persons 2 and 3)
 
-### Reproduce Full Model Training & Bayesian Tuning:
+Raw data is read from `Student folder/{train,student_test}/` (or `$PATHSNAP_DATA_DIR`). Run from the repo root, in order:
+
 ```bash
-python -m experiments.pipeline
+python -m src.features.dataset          # 1. labels (P1 monotone-DP alignment), candidates (R=100 m, K=30), 31 features -> data/processed/
+python -m src.models.train_compare      # 2. 6 models, GroupKFold(5) by trip + student-test -> results/model_comparison.csv, models/*.joblib
+python -m src.tuning.bayes_opt 30       # 3. Optuna TPE on LightGBM (30 trials) -> results/tuning/, models/lightgbm_tuned.joblib, OOF probs
+python -m src.hmm.evaluate 30           # 4. tune HMM decoder on train OOF probs, compare vs classifier-only -> configs/hmm.yaml, results/hmm/
+python -m src.models.route_eval         # 5. route metrics for every model + Section 3.1 table -> results/model_comparison_table.csv
+python -m src.models.error_analysis     # 6. error types (reverse twin / intersection / ...) -> results/error_analysis.csv
+python -m src.viz.make_report_maps      # 7. Folium maps for the report -> results/maps/
+pytest tests/                           # 8. API contract tests on all 10 student-test trips
 ```
-- Extracts 10 geometric/kinematic features across training trips.
-- Evaluates 5 model families (Logistic Regression, KNN, Random Forest, LightGBM, MLP) using GroupKFold.
-- Executes Bayesian hyperparameter optimization (Optuna TPE) on LightGBM.
-- Evaluates out-of-sample performance and HMM Viterbi decoding gains on all 10 `student_test` trips.
-- Saves model artifacts to `models/` and summary CSVs to `results/`.
 
-### Generate Interactive Folium Report Maps:
-```bash
-python -m src.viz.make_report_maps
-```
-- Generates interactive 5-layer Folium HTML maps for representative trips (`00000007`, `00000052`, `00000056`) in `results/maps/`.
+Seeds are fixed (`SEED = 42`); trips 33 and 54 (label-suspect, see `person1/docs/DATA_NOTES.md`) are excluded from training
+and model selection and reported separately. The evaluator partition is never read by any script.
+Logs of every run are in `results/logs/`.
 
----
+| Stage | Code | Main outputs |
+|---|---|---|
+| Features | `src/features/build.py` (`build_features(trip, cands)`, raw files only) | `FEATURE_COLUMNS` (31 features) |
+| Models | `src/models/zoo.py`, `src/models/train_compare.py` | `results/model_comparison.csv`, `results/model_cv_folds.csv`, `results/figures/models_*.png` |
+| Bayesian optimisation | `src/tuning/bayes_opt.py` | `results/tuning/optuna_trials.csv`, `best_params.json`, `untuned_vs_tuned.csv` |
+| HMM / Viterbi | `src/hmm/decoder.py`, `src/hmm/evaluate.py` | `configs/hmm.yaml`, `results/hmm/*.csv`, `results/figures/hmm_*.png` |
+| Metrics (shared with API) | `src/eval/metrics.py` | |
 
-## 7. Model Performance Benchmark
+## 7. Results
 
-### 5-Model Multi-Family Comparison (Out-of-Sample Student-Test Set)
-| Model | Algorithm Family | CV Macro F1 | Top-1 Accuracy | Macro F1 | Route Continuity | Inference Latency |
-|---|---|---|---|---|---|---|
-| **LightGBM (Tuned)** | **Gradient Boosting** | **0.9142** | **94.82%** | **92.40%** | **98.81%** | **18 ms** |
-| Random Forest | Ensemble (Bagging) | 0.8921 | 93.10% | 89.84% | 94.20% | 142 ms |
-| LightGBM (Default) | Gradient Boosting | 0.8874 | 92.45% | 88.92% | 93.55% | 22 ms |
-| MLP Classifier | Neural Network | 0.8410 | 88.20% | 83.15% | 89.10% | 35 ms |
-| K-Nearest Neighbors | Instance-Based | 0.8120 | 85.40% | 80.50% | 86.40% | 1150 ms |
-| Logistic Regression | Linear / Probabilistic | 0.7640 | 81.10% | 75.30% | 82.10% | 8 ms |
-
-### HMM Viterbi Sequential Decoding Impact
-- **Average Pointwise Accuracy Gain:** $+1.84\%$ over raw classifier predictions.
-- **Route Continuity Gain:** $+5.26\%$ improvement (from $93.55\%$ to $98.81\%$).
-- **Topological Disconnects:** Reduced from multiple random jumps to 0-1 breaks at true physical GPS gaps ($\Delta t > 5$ s).
+See `report/REPORT_SECTIONS_3_4_5.md` for the full write-up. Every number there is read from the CSV files above.
 
 ---
 

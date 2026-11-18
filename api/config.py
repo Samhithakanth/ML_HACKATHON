@@ -49,7 +49,7 @@ class APIConfig:
                 "data_dir": "Student folder",
                 "eval_partition": "student_test",
                 "train_partition": "train",
-                "model_path": "models/lightgbm_tuned_v1.joblib",
+                "model_path": "models/lightgbm_tuned.joblib",
                 "scaler_path": "models/scaler.joblib",
                 "hmm_config": "configs/hmm.yaml",
                 "log_file": "logs/api.log"

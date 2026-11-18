@@ -8,14 +8,15 @@ paths:
   data_dir: "Student folder"
   eval_partition: "student_test"
   train_partition: "train"
-  model_path: "models/lightgbm_tuned_v1.joblib"
+  model_path: "models/lightgbm_tuned.joblib"
   scaler_path: "models/scaler.joblib"
   hmm_config: "configs/hmm.yaml"
   log_file: "logs/api.log"
 
 pipeline:
-  max_candidates: 12
-  spatial_search_k: 35
+  # candidates: R = 100 m, K = 30 (src.data.candidates.candidate_table), shared with training
+  max_candidates: 30
+  spatial_search_k: 30
   network_buffer_m: 150.0
   max_network_segments: 25000
   gps_gap_threshold_s: 5.0

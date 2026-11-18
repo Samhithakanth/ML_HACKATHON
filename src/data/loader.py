@@ -87,3 +87,67 @@ def load_trip_raw(
 def get_metric_scale(mean_lat: float) -> np.ndarray:
     """Returns local equirectangular scaling factors [m/deg_lon, m/deg_lat]."""
     return np.array([111320.0 * np.cos(np.radians(mean_lat)), 110540.0])
+
+
+# ---------------------------------------------------------------------------
+# Person 1 loader (shared by training, evaluation and the API).
+# Each trip is projected into its own local azimuthal-equidistant CRS (metres),
+# because trips are spread all over the world (see person1/docs/DATA_NOTES.md).
+# ---------------------------------------------------------------------------
+import os
+from dataclasses import dataclass
+
+import pandas as pd
+from pyproj import Transformer
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def default_raw_dir() -> Path:
+    """Raw data folder: $PATHSNAP_DATA_DIR, else 'Student folder', else data/raw."""
+    if os.environ.get("PATHSNAP_DATA_DIR"):
+        return Path(os.environ["PATHSNAP_DATA_DIR"])
+    for cand in (REPO_ROOT / "Student folder", REPO_ROOT / "data" / "raw"):
+        if cand.exists():
+            return cand
+    return REPO_ROOT / "data" / "raw"
+
+
+RAW_DIR = default_raw_dir()
+SUSPECT_TRIPS = {"00000033", "00000054"}   # GPS drifts ~130 m off the reference route (P1)
+
+
+def local_crs(lon0: float, lat0: float):
+    crs = f"+proj=aeqd +lat_0={lat0} +lon_0={lon0} +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
+    return (Transformer.from_crs("EPSG:4326", crs, always_xy=True),
+            Transformer.from_crs(crs, "EPSG:4326", always_xy=True))
+
+
+def list_trips(partition: str, raw_dir: Path = None) -> List[str]:
+    raw_dir = Path(raw_dir or RAW_DIR)
+    return sorted(p.name for p in (raw_dir / partition).iterdir() if p.is_dir())
+
+
+@dataclass
+class Trip:
+    trip_id: str
+    partition: str
+    track: "pd.DataFrame"     # lon, lat, t, x, y
+    nodes: "pd.DataFrame"     # lon, lat, x, y ; index = node_id
+    arcs: "pd.DataFrame"      # from_node, to_node ; index = arc_id
+    route: Optional[np.ndarray] = None   # reference route (training / server-side scoring only)
+
+
+def load_trip(trip_id: str, partition: str, raw_dir: Path = None, load_route: bool = True) -> Trip:
+    """Load one trip and project it to local metres. load_route=False for inference (never reads .route)."""
+    d = Path(raw_dir or RAW_DIR) / partition / trip_id
+    track = pd.read_csv(d / f"{trip_id}.track", sep=r"\s+", header=None, names=["lon", "lat", "t"])
+    nodes = pd.read_csv(d / f"{trip_id}.nodes", sep=r"\s+", header=None, names=["lon", "lat"])
+    arcs = pd.read_csv(d / f"{trip_id}.arcs", sep=r"\s+", header=None, names=["from_node", "to_node"])
+    route = None
+    if load_route and (d / f"{trip_id}.route").exists():
+        route = pd.read_csv(d / f"{trip_id}.route", sep=r"\s+", header=None)[0].to_numpy()
+    fwd, _ = local_crs(track.lon.mean(), track.lat.mean())
+    track["x"], track["y"] = fwd.transform(track.lon.values, track.lat.values)
+    nodes["x"], nodes["y"] = fwd.transform(nodes.lon.values, nodes.lat.values)
+    return Trip(trip_id, partition, track, nodes, arcs, route)
