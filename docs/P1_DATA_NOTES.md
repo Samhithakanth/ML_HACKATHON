@@ -8,7 +8,7 @@ python -m src.data.label_audit     # results/eda/label_audit.csv
 python -m src.data.radius_sweep    # results/eda/radius_sweep_by_trip.csv (TRAIN only)
 python -m src.data.build_dataset   # data/processed/*.parquet
 python -m src.viz.eda_plots        # results/eda/plots/*.png
-python -m src.viz.folium_map       # results/maps/*.html
+python -m src.viz.p1_folium_map       # results/maps/*.html
 ```
 
 ## Dataset structure (verified, not assumed)
@@ -22,7 +22,7 @@ python -m src.viz.folium_map       # results/maps/*.html
 * Every trip has its **own road network** (nodes/arcs are per-trip files, ids are local row indices).
 * **Trips are located all over the world** (Ecuador, USA, Europe, Asia ...), one city per trip. A single UTM zone is
   therefore wrong. We project each trip into a **local azimuthal-equidistant CRS (metres) centred on its GPS centroid**
-  (`src/data/loader.py`). Distortion is negligible at trip scale (<= ~127 km extent).
+  (`src/data/p1_loader.py`). Distortion is negligible at trip scale (<= ~127 km extent).
 * Arcs are **directed**; ~82% have a reverse twin (identical geometry). Arcs are straight node-to-node segments.
 * `.route` = ordered arc ids. It is a fully connected path in 70/80 train and 9/10 test trips (see anomalies). **There are no per-point labels.**
 
@@ -38,7 +38,7 @@ python -m src.viz.folium_map       # results/maps/*.html
 * Trips are long and uneven: trip 54 alone has 19,313 points (9% of train) – use group-aware CV and consider per-trip weighting.
 
 ## Reference labels (derived)
-`.route` gives arcs, not per-point labels. `src/data/labels.py` aligns the GPS sequence to the route with a **monotone
+`.route` gives arcs, not per-point labels. `src/data/p1_labels.py` aligns the GPS sequence to the route with a **monotone
 dynamic programme** (non-decreasing route index, min sum of point-to-arc distance, O(T·R)).
 * 88/90 trips: median GPS→label distance ≈ 4.6 m (train) / 4.7 m (test), p99 ≈ 21 / 25 m → labels are reliable.
 * **Suspect trips: train 00000033 and 00000054.** GPS drifts 120–140 m away from the reference route for long
@@ -68,9 +68,9 @@ label_in_candidates, n_candidates, trip_label_suspect`
 `trip_id, point_idx, arc_id, dist_m, frac (position along arc 0-1), rank (0 = nearest), label (1 if arc_id == label_arc)`
 
 Join key: `(trip_id, point_idx)` ↔ points; `(trip_id, arc_id)` ↔ raw `.arcs` row index. `trip_id` is an 8-char zero-padded string.
-Load raw geometry with `src.data.loader.load_trip(trip_id, partition)` (returns track/nodes/arcs/route + `to_xy` projector).
+Load raw geometry with `src.data.p1_loader.load_trip(trip_id, partition)` (returns track/nodes/arcs/route + `to_xy` projector).
 Use `GroupKFold` on `trip_id`. `label_in_candidates == False` points cannot be scored correctly by any classifier
 (that is the candidate miss rate and is reported separately).
 
-For the API (Person 4): `generate_candidates(trip, 100, 30)` in `src/data/candidates.py` must run at inference time from the
+For the API (Person 4): `generate_candidates(trip, 100, 30)` in `src/data/p1_candidates.py` must run at inference time from the
 raw `.track/.nodes/.arcs` only – never from `.route`.

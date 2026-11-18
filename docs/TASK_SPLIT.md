@@ -4,7 +4,7 @@ Problem: reconstruct a vehicle's road-segment sequence from noisy 1 Hz GPS. Pipe
 **candidate arcs per GPS point -> classifier scores them -> HMM/Viterbi over the road graph -> FastAPI (laptop 1) + UI (laptop 2).**
 
 Data (verified): 80 train trips, 10 student-test trips, 10 hidden evaluator trips. Every trip has its own road network, and trips are
-located all over the world. See [person1/docs/DATA_NOTES.md](../person1/docs/DATA_NOTES.md).
+located all over the world. See [P1_DATA_NOTES.md](P1_DATA_NOTES.md).
 
 ## Hard requirements (from the organiser PDFs)
 - Train and compare **at least 5 models** from different families; group-aware CV by trip.
@@ -23,7 +23,7 @@ P4 starts in parallel with a stub predictor. Freeze the file formats early.
 ---
 
 ## Person 1: Data, EDA, labels, candidates (STATUS: DONE)
-**Done and in this repo under `person1/`** (`person1/src/`, `person1/notebooks/01_eda.ipynb`, `person1/results/eda/`, `person1/docs/DATA_NOTES.md`):
+**Done and in this repo** (`src/data/p1_*.py` plus the EDA scripts, `src/viz/`, `notebooks/01_eda.ipynb`, `results/eda/`, `docs/P1_DATA_NOTES.md`):
 1. Loader for `.track/.nodes/.arcs/.route`; **per-trip local azimuthal-equidistant projection** (trips are worldwide, so no single UTM zone).
 2. Inventory and quality scan of all 90 trips (counts, gaps, jumps, connectivity, isolated nodes, zero-length arcs, broken routes).
 3. **Per-point reference labels** via a monotone DP alignment of GPS to `.route`; validated numerically and visually on hard trips.
@@ -40,7 +40,7 @@ each analysis); screenshot the Folium map for the PDF; optionally add unit tests
 ---
 
 ## Person 2: Features and model experiments
-**Input:** `data/processed/*_points.parquet`, `*_candidates.parquet` (schemas in person1/docs/DATA_NOTES.md).
+**Input:** `data/processed/*_points.parquet`, `*_candidates.parquet` (schemas in docs/P1_DATA_NOTES.md).
 
 1. **Feature engineering** per (point, candidate arc). Candidates already carry `dist_m`, `frac`, `rank`. Add:
    - distance to arc endpoints, arc length, arc bearing vs GPS motion heading (separates the two directions of a street),
@@ -87,10 +87,10 @@ each analysis); screenshot the Folium map for the PDF; optionally add unit tests
 Full step-by-step in [PERSON4_WORKFLOW.md](../PERSON4_WORKFLOW.md). Summary:
 1. Repo hygiene: public repo, `.gitignore`, pinned `requirements.txt`, README (install / run / deploy / reproduce), secrets check.
 2. **FastAPI** (laptop 1): `GET /health`, `GET /trips`, `POST /predict {trip_id}`; one `predict_trip` function (raw files only, never `.route`);
-   server-side scoring against reference labels (`src.data.labels.align_to_route`) that are never returned; request logging to stdout and file.
+   server-side scoring against reference labels (`src.data.p1_labels.align_to_route`) that are never returned; request logging to stdout and file.
    Start with a stub (nearest-candidate baseline), swap in the real model when P2/P3 deliver.
 3. **UI** (laptop 2, e.g. Streamlit): list the 10 trips, send the trip ID only, show the predicted route on a map and the metrics; configurable API URL.
-4. **Folium**: extend `src/viz/folium_map.py` (GPS, network near the GPS, reference route, predicted route, legend, layer control); report maps for representative trips.
+4. **Folium**: extend `src/viz/p1_folium_map.py` (GPS, network near the GPS, reference route, predicted route, legend, layer control); report maps for representative trips.
 5. **Two-laptop test early** (LAN IP, firewall port 8000, hotspot as plan B); run all 10 trips; keep the API log visible.
 6. Assemble the single PDF in the Deliverables order; write **Section 7** (UI screenshots, API responses on the receiving laptop's CMD); verify every number against `results/`;
    AI-use disclosure.

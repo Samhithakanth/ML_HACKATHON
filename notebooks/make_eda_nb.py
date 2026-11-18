@@ -3,7 +3,7 @@ nb = nbf.v4.new_notebook(); C = []
 md = lambda s: C.append(nbf.v4.new_markdown_cell(s)); code = lambda s: C.append(nbf.v4.new_code_cell(s))
 md("""# 01 - Dataset exploration (Person 1)
 Partitions used: **train (80 trips)** for all fitting decisions (label audit, candidate radius/K); **student_test (10 trips)** only to report the same statistics.
-The evaluator-test partition is never touched. Run from the repo root: `python -m src.data.eda_inventory` etc. (see `docs/DATA_NOTES.md`); this notebook only reads their outputs.""")
+The evaluator-test partition is never touched. Run from the repo root: `python -m src.data.eda_inventory` etc. (see `docs/P1_DATA_NOTES.md`); this notebook only reads their outputs.""")
 code("""import sys, os; os.chdir(os.path.abspath('..')) if os.path.basename(os.getcwd())=='notebooks' else None; sys.path.insert(0, '.')
 import pandas as pd, numpy as np
 from IPython.display import Image, display
@@ -24,7 +24,7 @@ q""")
 code("""display(Image('results/eda/plots/02_dt_distribution.png')); display(Image('results/eda/plots/03_network_stats.png'))
 inv.sort_values('dt_max', ascending=False)[['trip_id','partition','n_gps','dt_max','n_gaps_gt5s','n_jumps_gt100m','step_max_m']].head(6)""")
 md("""## 3. Reference route -> per-point labels
-`.route` lists arcs only. Labels are derived with a monotone DP alignment (`src/data/labels.py`). Validation: GPS-to-label distance and a visual check on hard trips.""")
+`.route` lists arcs only. Labels are derived with a monotone DP alignment (`src/data/p1_labels.py`). Validation: GPS-to-label distance and a visual check on hard trips.""")
 code("""la = pd.read_csv('results/eda/label_audit.csv', dtype={'trip_id': str})
 display(la.groupby('partition')[['d_med','d_p90','d_p99','frac_gt100']].describe().T.round(2))
 la[la.frac_gt100 > 0.1][['trip_id','partition','d_med','d_p90','frac_gt100']]""")
@@ -40,8 +40,8 @@ for p, d in pts.items():
 md("""Chosen **R = 100 m, K = 30**: clean-trip miss rate ~0.65% (train) / 0.09% (student_test). R = 50 m doubles the miss rate; R = 150 m adds ~2x candidates for ~0.2 pp. ~26% of train points hit the K cap (dense urban networks), so P2 should include `rank` / distance-gap features.""")
 md("## 5. Interactive map\nOpen `results/maps/eda_train_00000001.html` (GPS fixes, nearby network, reference route, candidates of one point) and `results/maps/eda_train_00000033_drift.html` (GPS drift).")
 code("""import folium
-from src.data.loader import load_trip
-from src.viz.folium_map import make_map
+from src.data.p1_loader import load_trip
+from src.viz.p1_folium_map import make_map
 make_map(load_trip('00000001','train'), point_slice=slice(0,150), show_candidates_for=75)""")
-md("## 6. Hand-off\nSee `docs/DATA_NOTES.md` for the table schemas: `data/processed/{train,student_test}_{points,candidates}.parquet`.")
+md("## 6. Hand-off\nSee `docs/P1_DATA_NOTES.md` for the table schemas: `data/processed/{train,student_test}_{points,candidates}.parquet`.")
 nb.cells = C; nbf.write(nb, 'notebooks/01_eda.ipynb')

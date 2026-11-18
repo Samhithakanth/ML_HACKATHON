@@ -2,8 +2,8 @@
 import sys, numpy as np, matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from src.data.loader import load_trip, RAW_DIR
-from src.data.labels import align_to_route
+from src.data.p1_loader import load_trip, RAW_DIR
+from src.data.p1_labels import align_to_route
 
 CASES = [("train", "00000090"), ("train", "00000078"), ("train", "00000021"), ("train", "00000042"),
          ("student_test", "00000007"), ("student_test", "00000091")]

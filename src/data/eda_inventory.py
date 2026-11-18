@@ -2,7 +2,7 @@
 import numpy as np, pandas as pd
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
-from src.data.loader import RAW_DIR, PARTITIONS, list_trips, load_trip
+from src.data.p1_loader import RAW_DIR, PARTITIONS, list_trips, load_trip
 
 OUT = RAW_DIR.parents[1] / "results" / "eda"
 

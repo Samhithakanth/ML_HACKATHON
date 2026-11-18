@@ -1,7 +1,7 @@
 """Align every trip to its reference route and record label-quality stats."""
 import numpy as np, pandas as pd
-from src.data.loader import PARTITIONS, list_trips, load_trip, RAW_DIR
-from src.data.labels import align_to_route
+from src.data.p1_loader import PARTITIONS, list_trips, load_trip, RAW_DIR
+from src.data.p1_labels import align_to_route
 
 if __name__ == "__main__":
     rows, store = [], {}

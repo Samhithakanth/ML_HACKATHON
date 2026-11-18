@@ -1,8 +1,8 @@
 """Interactive Folium map: GPS fixes, road network, reference route, (optional) predicted route / candidates."""
 import numpy as np, pandas as pd, folium
 from pathlib import Path
-from src.data.loader import load_trip
-from src.data.candidates import generate_candidates
+from src.data.p1_loader import load_trip
+from src.data.p1_candidates import generate_candidates
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -18,7 +18,7 @@ def make_map(trip, predicted_arcs=None, point_slice=None, network_radius_m=150, 
     m = folium.Map(location=[tr.lat.mean(), tr.lon.mean()], zoom_start=15, tiles="OpenStreetMap")
     # network near the plotted GPS only (full networks have 100k+ arcs)
     from shapely import STRtree, points
-    from src.data.candidates import arc_geometries
+    from src.data.p1_candidates import arc_geometries
     g, _, _ = arc_geometries(trip)
     pi, ai = STRtree(g).query(points(tr[["x", "y"]].values), predicate="dwithin", distance=network_radius_m)
     fg = folium.FeatureGroup("Road network (within %d m of GPS)" % network_radius_m, show=True)
@@ -26,7 +26,7 @@ def make_map(trip, predicted_arcs=None, point_slice=None, network_radius_m=150, 
         folium.PolyLine(seg, color="#888", weight=2, opacity=0.7).add_to(fg)
     fg.add_to(m)
     ref = folium.FeatureGroup("Reference route (derived ground truth)", show=True)
-    from src.data.labels import align_to_route
+    from src.data.p1_labels import align_to_route
     j, arc, _ = align_to_route(trip)
     ids = pd.unique(arc[tr.index.values]) if point_slice is not None else trip.route
     for seg in _line(trip, ids): folium.PolyLine(seg, color="#1a9850", weight=5, opacity=0.9).add_to(ref)
