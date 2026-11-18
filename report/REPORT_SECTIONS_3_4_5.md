@@ -147,7 +147,19 @@ are hard to separate point by point, but easy to separate over a sequence. This 
 
 ### 3.4 Model selection
 
-<!-- SELECTION -->
+Ranked by the primary metric (CV top-1), the untuned models are: Random Forest 0.869, LightGBM 0.860, MLP 0.860, Logistic
+Regression 0.840, KNN 0.819, Gaussian NB 0.808. The four best are within one fold standard deviation (≈ 0.037) of each other, so
+CV alone does not separate RF, LightGBM and MLP. We chose **LightGBM for Bayesian optimisation** for these reasons:
+1. **It was tied for best quality before tuning.** Its CV top-1 is 0.009 below RF's, a quarter of the fold std. Its student-test top-1 is the same as RF's (0.866 vs 0.867).
+2. **Cost makes tuning feasible.** One LightGBM fit takes ~2.5 s, against ~110–150 s for RF and ~250 s for the MLP. Thirty trials of group CV cost
+   minutes for LightGBM and many hours for RF on one laptop.
+3. **It has the richest search space** (tree count, learning rate, leaves, depth, sampling, L1/L2), i.e. the most to gain from tuning.
+   Logistic regression and naive Bayes are underfitting, so tuning them cannot remove their bias.
+4. **Deployment.** The model is small and fast enough for the API.
+
+The choice was confirmed after tuning: the tuned LightGBM is the best model on every quality metric, both in CV (top-1 0.873, macro F1 0.930)
+and on student-test (top-1 0.882, macro F1 0.933, log loss 0.032). After HMM decoding it is also the best (0.963, table 3.1).
+The ranking of the models is essentially unchanged by HMM decoding (only the near-tied KNN and naive Bayes swap with RF pending, see table 3.1): a better classifier gives a better decoded route, so the classifier choice still matters even with the HMM.
 
 ---
 

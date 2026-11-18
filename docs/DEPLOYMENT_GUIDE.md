@@ -8,7 +8,7 @@ This document describes the exact procedure for configuring, deploying, and eval
 
 | Machine | Component | Host Responsibilities |
 |---|---|---|
-| **Laptop 1** | **Backend API & ML Engine** | Runs FastAPI on `0.0.0.0:8000`. Hosts trained LightGBM model (`models/lightgbm_tuned_v1.joblib`), HMM/Viterbi engine, raw road network, and private server-side reference labels. Evaluator monitors live request logs in the terminal. |
+| **Laptop 1** | **Backend API & ML Engine** | Runs FastAPI on `0.0.0.0:8000`. Hosts trained LightGBM model (`models/lightgbm_tuned.joblib`), HMM/Viterbi engine, raw road network, and private server-side reference labels. Evaluator monitors live request logs in the terminal. |
 | **Laptop 2** | **Evaluator UI** | Runs Streamlit interface (`ui/app.py`) or opens `/web/`. Connects to Laptop 1 via LAN. Sends **only trip IDs** to Laptop 1. Displays returned polylines and server-side calculated evaluation metrics. **Zero ground-truth data or models reside on Laptop 2.** |
 
 ---
@@ -46,7 +46,7 @@ Expected terminal output on Laptop 1:
 ```text
 2026-11-18 11:54:29 [INFO] [Client: SYSTEM] STARTUP - Initializing PathSnap API Server...
 2026-11-18 11:54:29 [INFO] [Client: SYSTEM] STARTUP - Loaded HMM configuration from hmm.yaml
-2026-11-18 11:54:29 [INFO] [Client: SYSTEM] STARTUP - Successfully loaded model: lightgbm_tuned_v1
+2026-11-18 11:54:29 [INFO] [Client: SYSTEM] STARTUP - Successfully loaded model: lightgbm_tuned
 2026-11-18 11:54:29 [INFO] [Client: SYSTEM] STARTUP - Discovered 10 evaluation trips in 'student_test' partition
 2026-11-18 11:54:32 [INFO] [Client: SYSTEM] STARTUP - PathSnap API Server initialization complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
@@ -64,7 +64,7 @@ curl http://<LAPTOP1_IP>:8000/health
 ```
 Expected response:
 ```json
-{"status":"ok","model":"lightgbm_tuned_v1","model_loaded":true,"n_trips":10}
+{"status":"ok","model":"lightgbm_tuned","model_loaded":true,"n_trips":10}
 ```
 
 ### Step 4.2: Launch the Evaluator UI (Option A: Streamlit)
@@ -87,7 +87,7 @@ http://<LAPTOP1_IP>:8000/web/
 ## 5. Acceptance Evaluation Walkthrough
 
 1. **Verify Connection:**
-   - In the sidebar, check the green badge: `● Connected (lightgbm_tuned_v1)`.
+   - In the sidebar, check the green badge: `● Connected (lightgbm_tuned)`.
 2. **Select Evaluation Trip:**
    - Choose any of the 10 evaluation trips from the dropdown (e.g. `Trip 00000007`).
    - The UI immediately renders the raw GPS track and nearby road network.
