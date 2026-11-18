@@ -1,0 +1,18 @@
+{
+  "best_params": {
+    "n_estimators": 500,
+    "learning_rate": 0.028950850956799147,
+    "num_leaves": 194,
+    "max_depth": 8,
+    "min_child_samples": 13,
+    "subsample": 0.5629898215508555,
+    "colsample_bytree": 0.7403904219080055,
+    "reg_alpha": 0.08316734057067703,
+    "reg_lambda": 1.9849750857789579,
+    "subsample_freq": 1
+  },
+  "best_cv_log_loss": 0.03531697064882368,
+  "n_trials": 30,
+  "seed": 42,
+  "objective": "mean 3-fold group-CV log loss (train, clean trips)"
+}
