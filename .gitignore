@@ -38,3 +38,7 @@ logs/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Persons 2/3: regenerable intermediates (python -m src.models.train_compare / src.tuning.bayes_opt)
+results/test_prob_*.npy
+models/random_forest.joblib

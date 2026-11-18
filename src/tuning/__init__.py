@@ -1,3 +1,1 @@
-from src.tuning.bayes_opt import run_bayesian_optimization
-
-__all__ = ["run_bayesian_optimization"]
+"""Person 3: Bayesian hyperparameter optimisation (python -m src.tuning.bayes_opt)."""

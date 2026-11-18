@@ -252,25 +252,22 @@ net_res = st.session_state.network_data
 if pred_res:
     metrics = pred_res["metrics"]
     m_cols = st.columns(4)
+    # Accuracy metrics are null when the server has no reference route: show "n/a", never a made-up number
+    _pct = lambda v: "n/a" if v is None else f"{v * 100:.2f}%"
+    _dlt = lambda a, b: None if a is None or b is None else f"{(a - b) * 100:+.2f}% vs Classifier"
 
     with m_cols[0]:
-        hmm_acc = metrics["hmm_pointwise_accuracy"] * 100
-        clf_acc = metrics["classifier_only_pointwise_accuracy"] * 100
-        delta_acc = hmm_acc - clf_acc
         st.metric(
             label="Pointwise Top-1 Accuracy",
-            value=f"{hmm_acc:.2f}%",
-            delta=f"{delta_acc:+.2f}% vs Classifier"
+            value=_pct(metrics["hmm_pointwise_accuracy"]),
+            delta=_dlt(metrics["hmm_pointwise_accuracy"], metrics["classifier_only_pointwise_accuracy"])
         )
 
     with m_cols[1]:
-        hmm_f1 = metrics["hmm_macro_f1"] * 100
-        clf_f1 = metrics["classifier_only_macro_f1"] * 100
-        delta_f1 = hmm_f1 - clf_f1
         st.metric(
             label="Macro F1-Score",
-            value=f"{hmm_f1:.2f}%",
-            delta=f"{delta_f1:+.2f}% vs Classifier"
+            value=_pct(metrics["hmm_macro_f1"]),
+            delta=_dlt(metrics["hmm_macro_f1"], metrics["classifier_only_macro_f1"])
         )
 
     with m_cols[2]:
@@ -420,15 +417,15 @@ if pred_res:
                 "Inference Latency"
             ],
             "Classifier-Only (Baseline)": [
-                f"{pred_res['metrics']['classifier_only_pointwise_accuracy']*100:.2f}%",
-                f"{pred_res['metrics']['classifier_only_macro_f1']*100:.2f}%",
-                "N/A (Discontinuous)",
-                "High",
+                _pct(pred_res['metrics']['classifier_only_pointwise_accuracy']),
+                _pct(pred_res['metrics']['classifier_only_macro_f1']),
+                _pct(pred_res['metrics'].get('classifier_only_route_continuity')),
+                "-",
                 "-"
             ],
             "HMM + Viterbi (Reconstructed)": [
-                f"{pred_res['metrics']['hmm_pointwise_accuracy']*100:.2f}%",
-                f"{pred_res['metrics']['hmm_macro_f1']*100:.2f}%",
+                _pct(pred_res['metrics']['hmm_pointwise_accuracy']),
+                _pct(pred_res['metrics']['hmm_macro_f1']),
                 f"{pred_res['metrics']['route_continuity']*100:.2f}%",
                 f"{pred_res['metrics']['n_disconnected_breaks']} breaks",
                 f"{pred_res['metrics']['inference_time_ms']} ms"

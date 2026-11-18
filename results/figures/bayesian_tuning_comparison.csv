@@ -1,3 +1,0 @@
-Configuration,CV Macro F1,Student-Test Top-1 Accuracy,Student-Test Macro F1,Log Loss,Inference Time
-Untuned Baseline (Default LightGBM),0.8974,0.6261,0.8262,0.2314,548 ms
-Bayesian Tuned (Optuna TPE LightGBM),0.9026,0.6514,0.8355,0.1118,1036 ms

@@ -13,8 +13,9 @@ import numpy as np
 from api.config import config
 from api.pipeline import predict_trip
 from src.models.predictor import PathSnapPredictor
-from src.data.loader import load_trip_raw, get_metric_scale
-from src.data.labels import align_to_route
+import yaml
+from src.data.loader import load_trip
+from src.data.labels import align_trip_to_route
 from src.eval.metrics import (
     compute_top1_accuracy,
     compute_macro_f1,
@@ -47,8 +48,7 @@ def generate_all_report_maps():
             data_dir=config.data_dir,
             partition=config.eval_partition,
             predictor=predictor,
-            spatial_k=config.pipeline["spatial_search_k"],
-            max_candidates=config.pipeline["max_candidates"]
+            hmm_config=yaml.safe_load(open(config.hmm_config_path, encoding="utf-8"))["hmm"],
         )
 
         hmm_arcs = res["predicted_arcs"]
@@ -57,18 +57,9 @@ def generate_all_report_maps():
         track = res["track"]
         nodes = res["nodes"]
 
-        # Server-side reference alignment for report evaluation
-        track_raw, nodes_raw, arcs_raw, route_raw = load_trip_raw(
-            tid,
-            config.data_dir,
-            partition=config.eval_partition,
-            load_route=True
-        )
-        mean_lat = float(np.mean(track[:, 1]))
-        scale = get_metric_scale(mean_lat)
-        track_m = track[:, :2] * scale
-        nodes_m = nodes * scale
-        ref_arcs = align_to_route(track_m, nodes_m, arcs, route_raw) if route_raw is not None else []
+        # Reference labels for the report (same monotone-DP alignment as training / API scoring)
+        trip = load_trip(tid, config.eval_partition, raw_dir=config.data_dir, load_route=True)
+        ref_arcs = align_trip_to_route(trip)[1].tolist() if trip.route is not None else []
 
         point_corr = compute_point_correctness(hmm_arcs, ref_arcs) if ref_arcs else None
         hmm_acc = compute_top1_accuracy(hmm_arcs, ref_arcs) if ref_arcs else 0.0

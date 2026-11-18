@@ -490,33 +490,30 @@ function renderMetricsPanel(data, clientElapsedMs) {
   const serverTime = m.inference_time_ms ? `${m.inference_time_ms} ms` : `${clientElapsedMs} ms`;
   el.resLatency.textContent = `${serverTime} (roundtrip: ${clientElapsedMs} ms)`;
 
+  // All numbers come from the API; null (no reference route on the server) is shown as n/a.
+  const pct = v => (v === null || v === undefined) ? 'n/a' : (v * 100).toFixed(1) + '%';
+  const num = v => (v === null || v === undefined) ? 'n/a' : v.toFixed(3);
+  const delta = (a, b, scale, digits, suffix) =>
+    (a === null || a === undefined || b === null || b === undefined) ? 'n/a'
+      : `${(a - b) >= 0 ? '+' : ''}${((a - b) * scale).toFixed(digits)}${suffix}`;
+
   // Accuracy
-  const hmmAccPct = (m.hmm_pointwise_accuracy * 100).toFixed(1) + '%';
-  const clfAccPct = (m.classifier_only_pointwise_accuracy * 100).toFixed(1) + '%';
-  const accDiff = ((m.hmm_pointwise_accuracy - m.classifier_only_pointwise_accuracy) * 100).toFixed(1);
-  el.hmmAcc.textContent = hmmAccPct;
-  el.clfAcc.textContent = clfAccPct;
-  el.accDelta.textContent = `+${accDiff}%`;
+  el.hmmAcc.textContent = pct(m.hmm_pointwise_accuracy);
+  el.clfAcc.textContent = pct(m.classifier_only_pointwise_accuracy);
+  el.accDelta.textContent = delta(m.hmm_pointwise_accuracy, m.classifier_only_pointwise_accuracy, 100, 1, '%');
 
   // Continuity
-  const hmmContPct = (m.route_continuity * 100).toFixed(1) + '%';
-  const clfContVal = m.classifier_only_pointwise_accuracy ? Math.max(0.65, m.route_continuity - 0.22) : 0.72;
-  const clfContPct = (clfContVal * 100).toFixed(1) + '%';
-  const contDiff = ((m.route_continuity - clfContVal) * 100).toFixed(1);
-  el.hmmCont.textContent = hmmContPct;
-  el.clfCont.textContent = clfContPct;
-  el.contDelta.textContent = `+${contDiff}%`;
+  el.hmmCont.textContent = pct(m.route_continuity);
+  el.clfCont.textContent = pct(m.classifier_only_route_continuity);
+  el.contDelta.textContent = delta(m.route_continuity, m.classifier_only_route_continuity, 100, 1, '%');
 
   // Macro F1
-  const hmmF1 = (m.hmm_macro_f1 || 0.92).toFixed(3);
-  const clfF1 = (m.classifier_only_macro_f1 || 0.78).toFixed(3);
-  const f1Diff = (hmmF1 - clfF1).toFixed(3);
-  el.hmmF1.textContent = hmmF1;
-  el.clfF1.textContent = clfF1;
-  el.f1Delta.textContent = `+${f1Diff}`;
+  el.hmmF1.textContent = num(m.hmm_macro_f1);
+  el.clfF1.textContent = num(m.classifier_only_macro_f1);
+  el.f1Delta.textContent = delta(m.hmm_macro_f1, m.classifier_only_macro_f1, 1, 3, '');
 
   // Breaks
-  const breaks = m.n_disconnected_breaks !== undefined ? m.n_disconnected_breaks : 1;
+  const breaks = m.n_disconnected_breaks !== undefined ? m.n_disconnected_breaks : '-';
   el.hmmBreaks.textContent = breaks;
   el.resTotalArcs.textContent = data.pred_route?.n_arcs || '-';
   el.breaksBadge.textContent = `${breaks} ${breaks === 1 ? 'break' : 'breaks'}`;
