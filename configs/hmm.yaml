@@ -1,0 +1,6 @@
+hmm:
+  stay_log_trans: -0.1
+  connected_log_trans: -0.3
+  disconnected_log_trans: -6.0
+  min_emission_prob: 1.0e-5
+  gap_split_threshold_s: 5.0

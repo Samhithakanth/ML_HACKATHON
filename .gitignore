@@ -1,0 +1,40 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+.env
+.env.*
+.venv/
+venv/
+ENV/
+env/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Large data directories and artifacts
+data/raw/
+data/processed/
+*.parquet
+*.h5
+
+# Keep models under 100MB, exclude huge instance-based models (>100MB exceeds GitHub push limits)
+models/k_nearest_neighbors.joblib
+models/*.tar.gz
+models/*.zip
+
+# Logs
+*.log
+logs/
+.system_generated/
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
