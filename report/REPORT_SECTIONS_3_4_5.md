@@ -58,7 +58,21 @@ Source: `results/model_comparison.csv` (+ `results/model_route_metrics.csv` for 
 CV = 5-fold GroupKFold on clean train (mean ± std over folds). Test = student-test (10 trips, 19,160 points). Inference time is
 measured on the full student-test candidate set (366,311 rows) on one laptop (22 logical cores).
 
-<!-- TABLE_3_1 -->
+| Model | Family | Key configuration | CV macro F1 | CV top-1 | Test top-1 (classifier) | Test top-1 (+HMM) | Route continuity (classifier / +HMM) | Test macro F1 | Test log loss | Inference (ms / 1k cand.) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Logistic Regression | Linear | C=1.0, L2, lbfgs, scaled | 0.9045 ± 0.0171 | 0.8402 ± 0.0368 | 0.8410 | 0.9225 | 0.9297 / 0.9836 | 0.9067 | 0.0464 | 0.12 |
+| Gaussian Naive Bayes | Probabilistic generative | var_smoothing=1e-9, scaled | 0.7441 ± 0.0071 | 0.8076 ± 0.0280 | 0.7717 | 0.9163 | 0.9190 / 0.9833 | 0.7376 | 0.7969 | 0.30 |
+| K-Nearest Neighbours | Instance-based | k=25, distance-weighted, 120k-row sample, scaled | 0.8901 ± 0.0193 | 0.8190 ± 0.0384 | 0.8260 | 0.9181 | 0.9183 / 0.9830 | 0.8961 | 0.0577 | 47.68 |
+| Random Forest | Bagging ensemble | 300 trees, min_leaf 5, max_features sqrt | 0.9274 ± 0.0174 | 0.8686 ± 0.0383 | 0.8665 | 0.9523 | 0.9391 / 0.9835 | 0.9271 | 0.0347 | 1.89 |
+| LightGBM (untuned) | Gradient boosting | defaults: 100 trees, lr 0.1, 31 leaves | 0.9245 ± 0.0177 | 0.8604 ± 0.0350 | 0.8658 | 0.9582 | 0.9220 / 0.9834 | 0.9265 | 0.0427 | 0.33 |
+| MLP | Neural network | (128,64) ReLU, Adam 1e-3, early stop (ep. 19), 300k rows | 0.9191 ± 0.0162 | 0.8603 ± 0.0375 | 0.8662 | 0.9348 | 0.9439 / 0.9831 | 0.9225 | 0.0376 | 0.41 |
+| **LightGBM (Bayesian-tuned, final)** | Gradient boosting | 500 trees, lr 0.029, 194 leaves, depth 8 (Sec. 4) | 0.9298 | 0.8733 | 0.8820 | 0.9627 | 0.9464 / 0.9835 | 0.9327 | 0.0320 | 3.66 |
+
+* Every model was trained and evaluated; none is N/A on any metric. All of them output probabilities, so log loss applies to all.
+* "Test top-1 (+HMM)" decodes every model's probabilities with the same tuned decoder (`configs/hmm.yaml`, tuned on the tuned
+  LightGBM's OOF probabilities; see 3.4 for why this favours LightGBM-shaped probabilities).
+* Inference: idle-machine benchmark, median of 3 passes over all 366,311 student-test candidate rows (`results/inference_timing.csv`, `src/models/timing.py`).
+* The tuned model's CV values come from the same 5 folds (`results/tuning/untuned_vs_tuned.csv`); the fold std is not stored for it.
 
 ### 3.2 Per-model analysis
 
@@ -69,7 +83,7 @@ Candidate-level positives are 6.2 % of rows, so recall/precision refer to the po
 #### 3.2.1 Logistic Regression (linear)
 * **Why suitable.** A calibrated linear baseline: most of the signal is monotone in a few features (closer, better aligned,
   present in the neighbouring points), so a linear log-odds model is a reasonable first fit. Its probabilities are directly usable as HMM emissions.
-* **Strengths / limitations.** Fast (4 s fit, 0.30 ms per 1k candidates), stable across folds, interpretable coefficients. It cannot
+* **Strengths / limitations.** Fast (4 s fit, 0.12 ms per 1k candidates), stable across folds, interpretable coefficients. It cannot
   model interactions, e.g. "the heading cosine matters only when the vehicle is moving", so it confuses the two directions of a
   street when the vehicle is slow.
 * **Hyperparameters / objective.** StandardScaler, L2 penalty C = 1.0, lbfgs, max_iter 2000. Objective: binary cross-entropy (log loss) + L2.
@@ -91,7 +105,7 @@ Candidate-level positives are 6.2 % of rows, so recall/precision refer to the po
 * **Why suitable.** A non-parametric local method: similar (distance, heading, context) patterns should share labels. It needs no assumption about the
   shape of the decision boundary.
 * **Strengths / limitations.** Captures local non-linear structure with no training. But prediction is expensive: every query
-  is compared with the stored rows, **57.7 ms per 1k candidates, 170× slower than LightGBM**, and 21 s for the student-test set.
+  is compared with the stored rows, **47.7 ms per 1k candidates, 143× slower than untuned LightGBM**, and 17.5 s for the student-test set.
   Because of that we stored only a 120k-row subsample. It is also sensitive to feature scaling and to the many uninformative dimensions.
 * **Hyperparameters / objective.** StandardScaler, k = 25, distance weighting, Euclidean metric, 120k-row training subsample. There is no loss
   function; the prediction is a weighted vote of the neighbours.
@@ -102,8 +116,8 @@ Candidate-level positives are 6.2 % of rows, so recall/precision refer to the po
 #### 3.2.4 Random Forest (bagging ensemble)
 * **Why suitable.** Averaged deep trees handle the feature interactions logistic regression misses: heading × speed,
   distance × number of candidates, and context × distance. They need no scaling and are robust to the fill value (150 m).
-* **Strengths / limitations.** Best CV top-1 and good calibration (log loss 0.037). But it is the slowest to train (147 s on all clean trips with 22 cores,
-  and ~110–155 s per fold), its model file is 74 MB, and inference is 3.0 ms per 1k candidates (9× LightGBM).
+* **Strengths / limitations.** Best CV top-1 and good calibration (log loss 0.037). But it is slow to train (158 s on all clean trips with 22 cores,
+  ~105–155 s per fold), its model file is 74 MB (not committed; regenerated by the script), and inference is 1.9 ms per 1k candidates (5.7× untuned LightGBM).
 * **Hyperparameters / objective.** 300 trees, min_samples_leaf 5, max_features sqrt, bootstrap; each tree is grown greedily to minimise Gini impurity.
 * **Results.** Top-1 0.867, macro F1 0.927, log loss 0.035 (CV top-1 **0.869 ± 0.038**, macro F1 0.927).
 * **Fit.** Train-fit top-1 0.947 vs CV 0.869: the largest gap of all models. It is **mildly overfitting / high variance** (deep trees with leaf size 5),
@@ -112,7 +126,7 @@ Candidate-level positives are 6.2 % of rows, so recall/precision refer to the po
 #### 3.2.5 LightGBM (gradient boosting) — selected for tuning
 * **Why suitable.** Boosted trees fit the same interactions as the forest but sequentially correct the remaining errors. They are fast on
   millions of rows and expose a rich hyperparameter space, which makes them a good candidate for Bayesian optimisation.
-* **Strengths / limitations.** 2.5 s training, 0.34 ms per 1k candidates, small model (0.16 MB). With the library defaults (100 trees, 31 leaves)
+* **Strengths / limitations.** 2.5 s training, 0.33 ms per 1k candidates, small model (0.16 MB). With the library defaults (100 trees, 31 leaves)
   its log loss (0.043) is worse than the forest's: defaults are not tuned for a 6 %-positive problem with 31 correlated features.
 * **Hyperparameters / objective.** Defaults: 100 trees, learning rate 0.1, 31 leaves, unlimited depth, min_child_samples 20,
   no subsampling. Objective: binary log loss (gradient boosting on its gradient/Hessian).
@@ -160,7 +174,13 @@ CV alone does not separate RF, LightGBM and MLP. We chose **LightGBM for Bayesia
 
 The choice was confirmed after tuning: the tuned LightGBM is the best model on every quality metric, both in CV (top-1 0.873, macro F1 0.930)
 and on student-test (top-1 0.882, macro F1 0.933, log loss 0.032). After HMM decoding it is also the best (0.963, table 3.1).
-The ranking of the models is essentially unchanged by HMM decoding (only the near-tied KNN and naive Bayes swap with RF pending, see table 3.1): a better classifier gives a better decoded route, so the classifier choice still matters even with the HMM.
+With HMM decoding, the ranking changes (table 3.1): tuned LightGBM 0.963, untuned LightGBM 0.958, Random Forest 0.952,
+MLP 0.935, Logistic Regression 0.923, KNN 0.918, Gaussian NB 0.916. Random Forest and the MLP are as good as untuned
+LightGBM point by point, but gain less from the decoder. One reason is a confound in our setup: the decoder parameters (notably the
+emission weight 0.25) were tuned on LightGBM probabilities, so they suit that model's probability distribution best. A fair comparison of
+the decoded routes would re-tune the decoder per model; we did not do that, so the +HMM column compares the models under the final system's decoder.
+The classifier choice still matters with the HMM: the best classifier gives the best route, and the gap between the weakest and the strongest
+model shrinks from 11 points (0.772 vs 0.882) to 4.6 points (0.916 vs 0.963), but it does not disappear.
 
 ---
 
@@ -204,12 +224,28 @@ the "untuned" starting point would have been worse than the real default.
 
 **6. Untuned vs tuned** (same features, same training rows, same 5 CV folds, same student-test set):
 
-<!-- TUNING_TABLE -->
+| Metric | Untuned | Tuned |
+|---|---|---|
+| CV macro F1 (5-fold, train) | 0.9245 | 0.9298 |
+| CV top-1 | 0.8604 | 0.8733 |
+| CV log loss | 0.0481 | 0.0351 |
+| Student-test top-1 (classifier only) | 0.8658 | 0.8820 |
+| Student-test top-1 (+HMM) | 0.9582 | 0.9627 |
+| Student-test macro F1 | 0.9265 | 0.9327 |
+| Student-test log loss | 0.0427 | 0.0320 |
+| Student-test precision / recall | 0.8674 / 0.8539 | 0.8912 / 0.8541 |
+| Inference, ms per 1k candidates (idle benchmark) | 0.33 | 3.66 |
+| Inference, all 366,311 test candidates (s) | 0.12 | 1.34 |
+| Training time on all clean trips (s, same run) | 13.0 | 83.6 |
+| Model file (MB) | 0.16 | 4.08 |
+
+(Training times in this table were both measured in the same run of `bayes_opt.py`, which ran while other jobs were active; compare them with each other, not with Section 3.)
 
 The tuned model is better on every quality metric. Its CV top-1 (0.873) is also above the untuned random forest (0.869), so after tuning,
 LightGBM is the best model overall. The price is inference cost: 500 trees with up to 194 leaves are slower than 100 × 31.
-This is still well within the API budget (a whole student-test trip is scored in well under a second; see Section 7 timings).
-Parameter importance (fANOVA, `tuning_importance.png`): <!-- IMPORTANCE -->
+It is still cheap in absolute terms: all 366,311 student-test candidates are scored in 1.34 s, i.e. 0.33 s for the largest test
+trip (00000056, 90,835 candidates). End-to-end API latency also includes building the HMM lattice (Section 7).
+Parameter importance (fANOVA over the 27 completed trials, `results/tuning/param_importance.csv`, `tuning_importance.png`): num_leaves 0.22, min_child_samples 0.21, colsample_bytree 0.19, learning_rate 0.16, n_estimators 0.08, reg_lambda 0.04, reg_alpha 0.04, max_depth 0.03, subsample 0.03. Tree capacity and sampling (num_leaves, min_child_samples, colsample_bytree) and the learning rate matter most; max_depth and row subsampling matter least once the others are set.
 
 ---
 
@@ -326,5 +362,7 @@ projection distance is almost the same on both arcs.
   The HMM still makes the route more continuous (0.853 → 0.916) and raises route F1 from 0.82 to 0.89. These trips measure
   the quality of the labels, not of the model.
 
-**Cost.** Decoding takes about 26 ms per 1,000 points on student-test, after building the lattice (route distances), which dominates
-the decoder time. See Section 7 for the end-to-end API latency.
+**Cost.** End-to-end latency of the API pipeline (`predict_trip`, the code behind `POST /predict`), measured on an idle machine for all
+10 student-test trips (`python -m api.benchmark` → `results/api_latency.csv`): **0.10–1.50 s per trip, mean 0.68 s**. Of that, on average,
+40 ms is candidate generation, 421 ms is features + tuned LightGBM, and 197 ms is the HMM (lattice route distances + Viterbi). The slowest trip
+is 00000056 (3,958 points). Decoding therefore adds about 41 % to the classifier-only pipeline time (197 ms vs 483 ms for everything else, on average), for +8 points of top-1.

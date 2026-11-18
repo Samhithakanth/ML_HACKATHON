@@ -1,7 +1,8 @@
 Model,Algorithm family,Key configuration,"CV macro F1 (5-fold, train)",Student-test top-1 (classifier only),Student-test top-1 (+HMM),Route continuity (classifier only),Route continuity (+HMM),Student-test macro F1,Student-test log loss,Inference time (ms / 1k candidates)
-Logistic Regression,Linear,"StandardScaler + L2 logistic regression, C=1.0, lbfgs",0.9045 ± 0.0171,0.841,0.9225,0.9297,0.9836,0.9067,0.0464,0.3
-Gaussian Naive Bayes,Probabilistic generative,"StandardScaler + Gaussian naive Bayes, var_smoothing=1e-9",0.7441 ± 0.0071,0.7717,0.9163,0.919,0.9833,0.7376,0.7969,0.36
-K-Nearest Neighbours,Instance-based,"StandardScaler + KNN, k=25, distance-weighted, 120k-row training subsample",0.8901 ± 0.0193,0.826,0.9181,0.9183,0.983,0.8961,0.0577,57.71
-LightGBM (untuned),Gradient boosting,"LightGBM defaults: 100 trees, lr=0.1, num_leaves=31",0.9245 ± 0.0177,0.8658,0.9582,0.922,0.9834,0.9265,0.0427,0.34
-MLP,Neural network,"StandardScaler + MLP (128, 64), ReLU, Adam, early stopping, <=30 epochs, 300k-row subsample",0.9191 ± 0.0162,0.8662,0.9348,0.9439,0.9831,0.9225,0.0376,0.78
-LightGBM (Bayesian-tuned),Gradient boosting,Optuna TPE best (see Section 4),0.9298,0.882,0.9627,0.9464,0.9835,0.9327,0.032,51.41
+Logistic Regression,Linear,"StandardScaler + L2 logistic regression, C=1.0, lbfgs",0.9045 ± 0.0171,0.841,0.9225,0.9297,0.9836,0.9067,0.0464,0.12
+Gaussian Naive Bayes,Probabilistic generative,"StandardScaler + Gaussian naive Bayes, var_smoothing=1e-9",0.7441 ± 0.0071,0.7717,0.9163,0.919,0.9833,0.7376,0.7969,0.3
+K-Nearest Neighbours,Instance-based,"StandardScaler + KNN, k=25, distance-weighted, 120k-row training subsample",0.8901 ± 0.0193,0.826,0.9181,0.9183,0.983,0.8961,0.0577,47.68
+Random Forest,Bagging ensemble,"300 trees, min_samples_leaf=5, max_features=sqrt",0.9274 ± 0.0174,0.8665,0.9523,0.9391,0.9835,0.9271,0.0347,1.89
+LightGBM (untuned),Gradient boosting,"LightGBM defaults: 100 trees, lr=0.1, num_leaves=31",0.9245 ± 0.0177,0.8658,0.9582,0.922,0.9834,0.9265,0.0427,0.33
+MLP,Neural network,"StandardScaler + MLP (128, 64), ReLU, Adam, early stopping, <=30 epochs, 300k-row subsample",0.9191 ± 0.0162,0.8662,0.9348,0.9439,0.9831,0.9225,0.0376,0.41
+LightGBM (Bayesian-tuned),Gradient boosting,Optuna TPE best (see Section 4),0.9298,0.882,0.9627,0.9464,0.9835,0.9327,0.032,3.66

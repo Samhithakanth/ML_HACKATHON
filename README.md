@@ -171,8 +171,11 @@ python -m src.features.dataset          # 1. labels (P1 monotone-DP alignment), 
 python -m src.models.train_compare      # 2. 6 models, GroupKFold(5) by trip + student-test -> results/model_comparison.csv, models/*.joblib
 python -m src.tuning.bayes_opt 30       # 3. Optuna TPE on LightGBM (30 trials) -> results/tuning/, models/lightgbm_tuned.joblib, OOF probs
 python -m src.hmm.evaluate 30           # 4. tune HMM decoder on train OOF probs, compare vs classifier-only -> configs/hmm.yaml, results/hmm/
-python -m src.models.route_eval         # 5. route metrics for every model + Section 3.1 table -> results/model_comparison_table.csv
+python -m src.models.route_eval         # 5. (after timing) route metrics for every model + Section 3.1 table -> results/model_comparison_table.csv
 python -m src.models.error_analysis     # 6. error types (reverse twin / intersection / ...) -> results/error_analysis.csv
+python -m src.hmm.break_analysis        #    remaining continuity breaks: multi-hop vs real jumps -> results/hmm/break_analysis.csv
+python -m src.models.timing             #    idle-machine inference benchmark -> results/inference_timing.csv
+python -m api.benchmark                 #    end-to-end API latency per trip -> results/api_latency.csv
 python -m src.viz.make_report_maps      # 7. Folium maps for the report -> results/maps/
 pytest tests/                           # 8. API contract tests on all 10 student-test trips
 ```
@@ -189,9 +192,16 @@ Logs of every run are in `results/logs/`.
 | HMM / Viterbi | `src/hmm/decoder.py`, `src/hmm/evaluate.py` | `configs/hmm.yaml`, `results/hmm/*.csv`, `results/figures/hmm_*.png` |
 | Metrics (shared with API) | `src/eval/metrics.py` | |
 
-## 7. Results
+## 7. Results (student-test, 10 trips, 19,160 GPS points)
 
-See `report/REPORT_SECTIONS_3_4_5.md` for the full write-up. Every number there is read from the CSV files above.
+| Pipeline | Top-1 | Route continuity | Route F1 | Source |
+|---|---|---|---|---|
+| Best untuned classifier (Random Forest) | 0.8665 | 0.9391 | – | `results/model_comparison.csv`, `results/model_route_metrics.csv` |
+| Bayesian-tuned LightGBM, classifier only | 0.8820 | 0.9464 | 0.901 | `results/tuning/untuned_vs_tuned.csv`, `results/hmm/hmm_vs_classifier_summary.csv` |
+| **Tuned LightGBM + HMM/Viterbi (served by the API)** | **0.9627** | **0.9835** | **0.973** | `results/hmm/hmm_vs_classifier_summary.csv` |
+
+End-to-end API latency: 0.10–1.50 s per trip, mean 0.68 s (`results/api_latency.csv`, `python -m api.benchmark`).
+Full write-up with all models, the tuning log and the HMM analysis: `report/REPORT_SECTIONS_3_4_5.md`.
 
 ---
 

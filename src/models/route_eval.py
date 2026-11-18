@@ -7,9 +7,13 @@ classifier-only route continuity / edit distance, and top-1 after HMM decoding w
     python -m src.models.route_eval
 
 Inputs: results/test_prob_<model>.npy (written by train_compare / bayes_opt), configs/hmm.yaml
+Inputs (optional): results/inference_timing.csv (python -m src.models.timing)
 Outputs: results/model_route_metrics.csv, results/model_comparison_table.csv (report Section 3.1)
 """
+import os
+
 import numpy as np
+from joblib import Parallel, delayed
 import pandas as pd
 import yaml
 
@@ -24,25 +28,31 @@ NAMES = {"logistic_regression": "Logistic Regression", "gaussian_nb": "Gaussian 
          "lightgbm_tuned": "LightGBM (Bayesian-tuned)"}
 
 
+def _trip_rows(tid, ref, Fi, probs, params):
+    """All models on one trip (one lattice shared by every model). Runs in a worker process."""
+    trip = load_trip(tid, "student_test", load_route=False)
+    arcs = trip.arcs.values
+    lat = build_lattice(trip, Fi, gap_s=params["gap_s"])
+    rows = []
+    for m, p in probs.items():
+        c = sequence_metrics(top1_from_scores(Fi, p, len(ref)), ref, arcs)
+        h = sequence_metrics(decode(lat, p, params), ref, arcs)
+        rows.append({"model": m, "trip_id": tid, "n": len(ref), "clf_top1": c["top1"], "clf_continuity": c["continuity"],
+                     "clf_edit_distance": c["edit_distance"], "hmm_top1": h["top1"], "hmm_continuity": h["continuity"],
+                     "hmm_edit_distance": h["edit_distance"]})
+    return rows
+
+
 def main():
     F, P = load_partition("student_test")
     params = yaml.safe_load(open(REPO_ROOT / "configs" / "hmm.yaml"))["hmm"]
     models = [m for m in NAMES if (RES / f"test_prob_{m}.npy").exists()]
     probs = {m: np.load(RES / f"test_prob_{m}.npy") for m in models}
-    rows = []
-    for tid, g in P.groupby("trip_id"):
-        msk = (F.trip_id == tid).values
-        Fi, ref = F[msk], g.label_arc.values
-        trip = load_trip(tid, "student_test", load_route=False)
-        arcs = trip.arcs.values
-        lat = build_lattice(trip, Fi, gap_s=params["gap_s"])
-        for m in models:
-            p = probs[m][msk]
-            c = sequence_metrics(top1_from_scores(Fi, p, len(ref)), ref, arcs)
-            h = sequence_metrics(decode(lat, p, params), ref, arcs)
-            rows.append({"model": m, "trip_id": tid, "n": len(ref), "clf_top1": c["top1"], "clf_continuity": c["continuity"],
-                         "clf_edit_distance": c["edit_distance"], "hmm_top1": h["top1"], "hmm_continuity": h["continuity"],
-                         "hmm_edit_distance": h["edit_distance"]})
+    groups = [(tid, g.label_arc.values, (F.trip_id == tid).values) for tid, g in P.groupby("trip_id")]
+    out = Parallel(n_jobs=min(len(groups), os.cpu_count() or 1))(
+        delayed(_trip_rows)(tid, ref, F[msk][["point_idx", "arc_id", "frac"]], {m: probs[m][msk] for m in models}, params)
+        for tid, ref, msk in groups)
+    rows = [r for o in out for r in o]
     D = pd.DataFrame(rows)
     S = D.groupby("model").apply(lambda g: pd.Series({
         c: np.average(g[c], weights=g.n) for c in ["clf_top1", "clf_continuity", "hmm_top1", "hmm_continuity"]
@@ -51,6 +61,9 @@ def main():
     S.to_csv(RES / "model_route_metrics.csv", index=False)
 
     C = pd.read_csv(RES / "model_comparison.csv").set_index("model")
+    # inference time: idle-machine benchmark (src/models/timing.py) if available, else the time recorded during training
+    timing = (pd.read_csv(RES / "inference_timing.csv").set_index("model").ms_per_1k_rows
+              if (RES / "inference_timing.csv").exists() else None)
     T = []
     tuned = pd.read_csv(RES / "tuning" / "untuned_vs_tuned.csv") if (RES / "tuning" / "untuned_vs_tuned.csv").exists() else None
     for m in models:
@@ -71,7 +84,7 @@ def main():
                   "Route continuity (classifier only)": round(s.clf_continuity, 4),
                   "Route continuity (+HMM)": round(s.hmm_continuity, 4),
                   "Student-test macro F1": round(f1, 4), "Student-test log loss": round(ll, 4),
-                  "Inference time (ms / 1k candidates)": round(inf, 2)})
+                  "Inference time (ms / 1k candidates)": round(float(timing[m]) if timing is not None and m in timing.index else inf, 2)})
     T = pd.DataFrame(T)
     T.to_csv(RES / "model_comparison_table.csv", index=False)
     print(T.to_string(index=False))
