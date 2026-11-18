@@ -1,7 +1,7 @@
 # PathSnap Technical Report — Sections 3, 4 and 5 (Persons 2 and 3)
 
 Every number in this file is read from a CSV in `results/` produced by the scripts listed in the README
-(section 6, "Reproducing the Experiments"). Seeds are fixed (42). Nothing here was typed in by hand from memory.
+(section 6, "Reproducing the Experiments"); the file next to each table is its source. Seeds are fixed (42).
 
 **Data partitions used**
 
@@ -30,7 +30,7 @@ decodes a connected sequence from the same scores.
 | topology | `out_deg_to`, `in_deg_from`, `has_twin` | intersections vs plain road |
 | context | `prev_same_dist`, `next_same_dist`, `prev_conn_dist`, `next_conn_dist`, `progress_along`, `progress_vs_move`, `win_frac`, `win_mean_dist` | is the same / a graph-connected arc also close at t−1 and t+1, does the projection move forward along the arc, how often is the arc a candidate in a ±5-point window |
 
-On one test trip the true arcs average 7 m from the fix with heading cosine 0.84, against 49 m and −0.13 for the other candidates.
+Example (student-test trip 00000007): the true arcs average 7.3 m from the fix with a mean heading cosine of 0.84, against 48.8 m and −0.13 for the other candidates.
 
 **Protocol (`src/models/train_compare.py`).** GroupKFold(5) by trip on the 78 clean train trips (fold membership in
 `results/cv_folds.json`). Training rows: at most 800 random points per trip with all their candidates (so the longest trips
@@ -122,12 +122,13 @@ Candidate-level positives are 6.2 % of rows, so recall/precision refer to the po
 #### 3.2.6 Multi-Layer Perceptron (neural network)
 * **Why suitable.** A smooth non-linear function of all features jointly, trained directly on log loss. It is the neural-network family and has a real epoch history.
 * **Strengths / limitations.** Good calibration (log loss 0.038) at the cost of the longest training time here (249 s for a capped
-  300k-row sample, 30 epochs, early stopping). It needs scaling, and its results depend on the optimiser settings and seed.
+  300k-row sample, early-stopped at epoch 19). It needs scaling, and its results depend on the optimiser settings and seed.
 * **Hyperparameters / objective.** StandardScaler, hidden layers (128, 64), ReLU, Adam (lr 1e-3), batch 1024, ≤ 30 epochs, early stopping
   on a 10 % validation split (patience 4), 300k-row training subsample. Objective: binary cross-entropy.
 * **Results.** Top-1 0.866, macro F1 0.923, log loss 0.038 (CV top-1 0.860 ± 0.038, macro F1 0.919).
-* **Fit.** Train-fit 0.873 vs CV 0.860: a small gap. The loss curve (`models_mlp_loss_curve.png`) is still decreasing slowly when early
-  stopping / the epoch cap ends training, so it is **slightly underfitting** rather than overfitting.
+* **Fit.** Train-fit 0.873 vs CV 0.860: a small gap. In the loss curve (`models_mlp_loss_curve.png`, final model) the training loss keeps falling
+  (0.085 → 0.036) while the validation accuracy peaks at epoch 14 (0.9861) and then flattens. Early stopping therefore ended training at epoch 19,
+  before the 30-epoch cap, at the point where more epochs would start to overfit. So the network is **well fitted**, neither over- nor underfitting.
 
 #### Common observation: the per-trip spread is larger than the gap between models
 Fold-to-fold standard deviation of CV top-1 is about 0.035–0.038 for every model, larger than the gap between
@@ -239,8 +240,8 @@ straight-line distance between them. For consecutive candidates a (at t−1, fra
 
 log T(a→b) = −|d_route − d_gc| / β, where d_gc is the straight-line distance between the two GPS fixes. All pairwise route distances of a
 trip are computed once and vectorised (unique (source, target) node pairs, batched Dijkstra), so tuning β, back_mult or
-the floor only re-runs the cheap Viterbi pass. The recursion runs in log space with a (K_{t−1} × K_t) max-plus product per step.
-The longest train trip (19,313 points) decodes in about a second.
+the floor only re-runs the cheap Viterbi pass. The recursion runs in log space with a (K_{t−1} × K_t) max-plus product per step. The Viterbi pass itself costs about
+26 ms per 1,000 points on student-test (`decode_s_per_1k_points` in `results/hmm/hmm_vs_classifier_summary.csv`).
 
 ### 5.4 Missing candidates and large GPS gaps
 * **No candidates** (0.68 % of train points, 0.09 % of student-test): the chain is cut, the point gets no arc (−1, counted as
@@ -305,16 +306,18 @@ transition model alone does not have.
 
 The largest single error type of the classifier is the **reverse twin**. When the vehicle is slow, the GPS heading is noise and both
 directions look identical point by point. The HMM resolves most of these, because a route cannot flip direction from one second to the next
-without a long detour. Points at an intersection remain the hardest: 1.5 % of points are still the arc adjacent to the true one.
-Usually the decoder switches to the next arc a few points too early or too late.
+without a long detour. Points at an intersection improve least: 1.5 % of points are still assigned the arc adjacent to the true one. Our interpretation
+(not separately measured) is that near a node the decoder can switch to the next arc a point or two early or late, because the
+projection distance is almost the same on both arcs.
 
 **Cases where the HMM did not help (or helped less)**
 * **Trip 00000063 (train, OOF)**: the only one of 78 train trips where the HMM is slightly worse (0.8278 → 0.8252). On every student-test
   trip the HMM is better than the classifier (`hmm_vs_classifier_per_trip.csv`).
 * **Trips 00000009 and 00000065 (student-test)**: the tuned decoder is *worse than the default decoder* (0.918 → 0.903 and 0.880 →
-  0.866), although both beat the classifier. These are the two lowest-scoring test trips. The tuned decoder's low emission weight makes it
-  stick to a connected path; where the classifier is right and the graph path is ambiguous (parallel roads, short arcs), this
-  follows the wrong branch for longer. Tuning optimises the average over trips, not every trip.
+  0.866), although both beat the classifier. These are the two lowest-scoring test trips. A likely explanation (a hypothesis, not separately tested):
+  the tuned decoder's low emission weight makes it stick to a connected path, so where the graph offers two plausible branches
+  (parallel roads, many short arcs) it can follow the wrong one for longer before the classifier evidence pulls it back.
+  Tuning optimises the average over the train trips, not every individual trip.
 * **Remaining continuity "breaks"** (316 on student-test, `results/hmm/break_analysis.csv`): **all 316** are pairs of arcs joined by a
   directed road path of ≤ 300 m. The vehicle crossed one or more short arcs within one GPS interval, which the strict continuity
   metric (same or directly adjacent arc) counts as a break. None is a jump between unconnected parts of the network, so the decoded
