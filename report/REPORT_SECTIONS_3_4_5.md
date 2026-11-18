@@ -244,7 +244,7 @@ the "untuned" starting point would have been worse than the real default.
 The tuned model is better on every quality metric. Its CV top-1 (0.873) is also above the untuned random forest (0.869), so after tuning,
 LightGBM is the best model overall. The price is inference cost: 500 trees with up to 194 leaves are slower than 100 × 31.
 It is still cheap in absolute terms: all 366,311 student-test candidates are scored in 1.34 s, i.e. 0.33 s for the largest test
-trip (00000056, 90,835 candidates). End-to-end API latency also includes building the HMM lattice (Section 7).
+trip (00000056, 90,835 candidates). End-to-end API latency, including the HMM, is 0.68 s per trip on average (Section 5.6, "Cost").
 Parameter importance (fANOVA over the 27 completed trials, `results/tuning/param_importance.csv`, `tuning_importance.png`): num_leaves 0.22, min_child_samples 0.21, colsample_bytree 0.19, learning_rate 0.16, n_estimators 0.08, reg_lambda 0.04, reg_alpha 0.04, max_depth 0.03, subsample 0.03. Tree capacity and sampling (num_leaves, min_child_samples, colsample_bytree) and the learning rate matter most; max_depth and row subsampling matter least once the others are set.
 
 ---
