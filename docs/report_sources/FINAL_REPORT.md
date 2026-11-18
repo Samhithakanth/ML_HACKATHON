@@ -123,10 +123,10 @@ topology/context features because the true arc is usually connected to the arc c
 
 #### Visualisations
 
-![Candidate miss rate vs radius and cap (train)](../results/eda/plots/05_candidate_miss_rate.png)
-![GPS over the reference route on six hard trips (blue GPS, green route, red = more than 50 m away)](../results/eda/plots/07_label_alignment_check.png)
-![Road-network size and connectivity](../results/eda/plots/03_network_stats.png)
-![Time step between fixes](../results/eda/plots/02_dt_distribution.png)
+![Candidate miss rate vs radius and cap (train)](../../results/eda/plots/05_candidate_miss_rate.png)
+![GPS over the reference route on six hard trips (blue GPS, green route, red = more than 50 m away)](../../results/eda/plots/07_label_alignment_check.png)
+![Road-network size and connectivity](../../results/eda/plots/03_network_stats.png)
+![Time step between fixes](../../results/eda/plots/02_dt_distribution.png)
 
 
 Partition for each figure is stated in its title or here.
@@ -151,8 +151,8 @@ Partition for each figure is stated in its title or here.
 | `results/maps/eda_train_00000001.html` (screenshot `results/maps/screenshots/eda_train_00000001.png`) | train trip 00000001, 15 consecutive fixes on a motorway interchange (Darmstadt area): GPS fixes (blue), road network within 150 m of the GPS (grey), reference route (green), and the candidate arcs of one point (orange), with legend and layer control |
 | `results/maps/eda_train_00000033_drift.html` (screenshot `results/maps/screenshots/eda_train_00000033_drift.png`) | train trip 00000033, 60 fixes: a stationary cluster of GPS fixes (blue) about 130 m from the reference route (green): the reference-route limitation described above |
 
-![Folium map, train trip 00000001](../results/maps/screenshots/eda_train_00000001.png)
-![Folium map, train trip 00000033 (reference-route drift)](../results/maps/screenshots/eda_train_00000033_drift.png)
+![Folium map, train trip 00000001](../../results/maps/screenshots/eda_train_00000001.png)
+![Folium map, train trip 00000033 (reference-route drift)](../../results/maps/screenshots/eda_train_00000033_drift.png)
 
 #### Assumptions and limitations
 
@@ -278,10 +278,10 @@ are hard to separate point by point, but easy to separate over a sequence. This 
 
 ### 3.3 Model Visualisations
 
-![Model comparison](../results/figures/models_comparison.png)
-![Train / CV / test top-1](../results/figures/models_train_cv_test.png)
-![Confusion matrices](../results/figures/models_confusion_matrices.png)
-![MLP loss curve](../results/figures/models_mlp_loss_curve.png)
+![Model comparison](../../results/figures/models_comparison.png)
+![Train / CV / test top-1](../../results/figures/models_train_cv_test.png)
+![Confusion matrices](../../results/figures/models_confusion_matrices.png)
+![MLP loss curve](../../results/figures/models_mlp_loss_curve.png)
 
 * `results/figures/models_comparison.png`: CV vs student-test top-1, macro F1 and log loss for every model.
 * `results/figures/models_train_cv_test.png`: train-fit vs CV vs student-test top-1 (over/underfitting check).
@@ -351,8 +351,8 @@ the "untuned" starting point would have been worse than the real default.
 The tuned model is better on every quality metric. Its CV top-1 (0.873) is above every untuned model with a verified CV score, so after tuning,
 LightGBM is the best model overall. The price is inference cost: 500 trees with up to 194 leaves are slower than 100 × 31.
 This is still well within the API budget (a whole student-test trip is scored in well under a second; see Section 7 timings).
-![Tuning history](../results/figures/tuning_history.png)
-![Parameter importance](../results/figures/tuning_importance.png)
+![Tuning history](../../results/figures/tuning_history.png)
+![Parameter importance](../../results/figures/tuning_importance.png)
 
 Parameter importance (fANOVA, `tuning_importance.png`): num_leaves 0.22, min_child_samples 0.21, colsample_bytree 0.19, learning_rate 0.16, n_estimators 0.08, reg_lambda 0.04, reg_alpha 0.04, max_depth 0.03, subsample 0.03.
 
@@ -474,8 +474,8 @@ projection distance is almost the same on both arcs.
 **Cost.** Decoding takes about 26 ms per 1,000 points on student-test, after building the lattice (route distances), which dominates
 the decoder time. See Section 7 for the end-to-end API latency.
 
-![HMM vs classifier, top-1 per trip](../results/figures/hmm_vs_classifier_top1.png)
-![HMM decoder tuning](../results/figures/hmm_decoder_tuning.png)
+![HMM vs classifier, top-1 per trip](../../results/figures/hmm_vs_classifier_top1.png)
+![HMM decoder tuning](../../results/figures/hmm_decoder_tuning.png)
 
 ---
 
@@ -528,8 +528,8 @@ All maps were generated using the reproducible script `python -m src.viz.make_re
 
 #### Screenshots of the interactive maps
 
-![Train trip 00000001: GPS, nearby network, reference route and the candidate arcs of one point](../results/maps/screenshots/eda_train_00000001.png)
-![Train trip 00000033: stationary GPS cluster about 130 m from the reference route (label-suspect trip)](../results/maps/screenshots/eda_train_00000033_drift.png)
+![Train trip 00000001: GPS, nearby network, reference route and the candidate arcs of one point](../../results/maps/screenshots/eda_train_00000001.png)
+![Train trip 00000033: stationary GPS cluster about 130 m from the reference route (label-suspect trip)](../../results/maps/screenshots/eda_train_00000033_drift.png)
 
 The maps of the held-out evaluator trips are in Appendix A.6. Every map is generated from the team's own pipeline (`src/viz/folium_map.py`, `src/viz/make_report_maps.py`, `src/viz/make_final_maps.py`, `src/viz/p1_folium_map.py`).
 
@@ -568,7 +568,7 @@ The response `metrics` are: HMM and classifier-only pointwise accuracy, route co
 ### 7.3 Screenshots of the working UI
 
 The screenshots were taken from the real evaluator UI (`http://<laptop-1-ip>:8000/web/`, served by the API) running against the 10 evaluator trips. Each result is produced by a live `POST /predict`; nothing is mocked
-(`report/capture_ui_screenshots.py` drives the page and takes the screenshots).
+(`docs/report_sources/capture_ui_screenshots.py` drives the page and takes the screenshots).
 
 ![UI connected to the API (badge: Connected, lightgbm_tuned); trip list loaded, raw GPS of trip 00000015 shown](screenshots/ui_1_connected.png)
 
@@ -660,7 +660,7 @@ The final system assigns the correct reference road segment to **95.8 % of the 1
 14.3 percentage points and cut route breaks from 48.9 to
 21.7 per 1,000 points.
 
-![Per-trip top-1, evaluator_test](../results/figures/final_evaluator_test_top1.png)
+![Per-trip top-1, evaluator_test](../../results/figures/final_evaluator_test_top1.png)
 
 ### A.2 Per-trip results (classifier + HMM)
 
@@ -723,6 +723,6 @@ Evidence: `results/final/evaluator_test_api_check.csv` and the request log lines
 Interactive maps: `results/maps/evaluator_test_<trip>.html` (code: `src/viz/make_final_maps.py`). Layers: road network, raw GPS, reference route, classifier-only route,
 HMM route, per-point correctness.
 
-![Evaluator trip 00000015: largest classifier to HMM gain](../results/maps/screenshots/evaluator_test_00000015.png)
-![Evaluator trip 00000030: weakest trip](../results/maps/screenshots/evaluator_test_00000030.png)
-![Evaluator trip 00000049: 100 % correct](../results/maps/screenshots/evaluator_test_00000049.png)
+![Evaluator trip 00000015: largest classifier to HMM gain](../../results/maps/screenshots/evaluator_test_00000015.png)
+![Evaluator trip 00000030: weakest trip](../../results/maps/screenshots/evaluator_test_00000030.png)
+![Evaluator trip 00000049: 100 % correct](../../results/maps/screenshots/evaluator_test_00000049.png)

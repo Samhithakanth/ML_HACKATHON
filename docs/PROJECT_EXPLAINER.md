@@ -104,7 +104,7 @@ src/tuning/ Bayesian optimisation              src/hmm/ Viterbi decoder and rout
 src/eval/   shared metrics (used by the API and by the experiments)       src/viz/ Folium maps and EDA plots
 configs/    api.yaml (paths, ports), hmm.yaml (tuned decoder settings)
 models/     saved models and the scaler       results/ all experiment outputs, plots, maps
-report/     the report sections               docs/ guides, data notes, this file
+report/     the final report (PDF only)       docs/ guides, data notes, report_sources/ (report drafts and build scripts)
 Student folder/   the dataset (train and student_test)
 ```
 

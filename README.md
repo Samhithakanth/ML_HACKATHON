@@ -191,7 +191,7 @@ Logs of every run are in `results/logs/`.
 
 ## 7. Results
 
-See `report/REPORT_SECTIONS_3_4_5.md` for the full write-up. Every number there is read from the CSV files above.
+See the final report `report/FINAL_REPORT.pdf` (sources in `docs/report_sources/`) for the full write-up. Every number there is read from the CSV files above.
 
 ---
 

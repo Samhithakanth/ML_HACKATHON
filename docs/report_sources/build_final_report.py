@@ -1,12 +1,12 @@
 """
-report/build_final_report.py
+docs/report_sources/build_final_report.py
 
 Assembles the single consolidated technical report (Markdown -> HTML -> PDF) in the structure required by
 Deliverables.pdf (sections 2-7), plus a final held-out evaluation (8) and the integrity statement (9).
 Every table is read from the CSV files in results/; prose is taken from the team's section files, with the
 corrections listed in the CORRECTIONS block below applied (each replacement is asserted so nothing fails silently).
 
-    python report/build_final_report.py        # -> report/FINAL_REPORT.md, .html, .pdf   (PDF needs Microsoft Edge)
+    python docs/report_sources/build_final_report.py   # -> docs/report_sources/FINAL_REPORT.md and report/FINAL_REPORT.pdf (PDF needs Microsoft Edge)
 """
 from __future__ import annotations
 
@@ -21,9 +21,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 R = ROOT / "results"
-REP = ROOT / "report"
+REP = Path(__file__).resolve().parent        # sources: docs/report_sources (section drafts, screenshots, FINAL_REPORT.md)
+OUT_PDF = ROOT / "report" / "FINAL_REPORT.pdf"   # the only file kept in report/
 
 
 def rd(p, **kw):
@@ -247,7 +248,7 @@ The response `metrics` are: HMM and classifier-only pointwise accuracy, route co
 ### 7.3 Screenshots of the working UI
 
 The screenshots were taken from the real evaluator UI (`http://<laptop-1-ip>:8000/web/`, served by the API) running against the 10 evaluator trips. Each result is produced by a live `POST /predict`; nothing is mocked
-(`report/capture_ui_screenshots.py` drives the page and takes the screenshots).
+(`docs/report_sources/capture_ui_screenshots.py` drives the page and takes the screenshots).
 
 ![UI connected to the API (badge: Connected, lightgbm_tuned); trip list loaded, raw GPS of trip 00000015 shown](screenshots/ui_1_connected.png)
 
@@ -428,6 +429,7 @@ The system is served by a FastAPI backend and an evaluator UI on two laptops; re
     body345 = t[t.index("## 3. Model Experimentation"):]
     out = "\n\n".join([front, s2.strip(), "---", body345.strip(), "---", sec6.strip(), "---", SECTION_7.strip(), "---", INTEGRITY.strip(), "---", final_eval_section().strip()]) + "\n"
     out = re.sub(r"\n---\n\s*\n---\n", "\n---\n", out)
+    out = out.replace("](../results/", "](../../results/")      # image links are relative to docs/report_sources/
     md_path = REP / "FINAL_REPORT.md"
     md_path.write_text(out, encoding="utf-8")
     return md_path
@@ -451,11 +453,13 @@ def to_pdf(md_path: Path) -> Path:
     html = f"<!doctype html><html><head><meta charset='utf-8'><title>PathSnap Technical Report</title><style>{CSS}</style></head><body>{html_body}</body></html>"
     html_path = md_path.with_suffix(".html")
     html_path.write_text(html, encoding="utf-8")
-    pdf = md_path.with_suffix(".pdf")
+    pdf = OUT_PDF
+    pdf.parent.mkdir(exist_ok=True)
     edge = next((p for p in (r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe", r"C:\Program Files\Microsoft\Edge\Application\msedge.exe") if Path(p).exists()), None)
     assert edge, "Microsoft Edge not found; open FINAL_REPORT.html in a browser and print to PDF"
     subprocess.run([edge, "--headless=new", "--disable-gpu", "--no-pdf-header-footer", f"--print-to-pdf={pdf}", html_path.as_uri()],
                    check=True, timeout=180, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    html_path.unlink()                       # generated intermediate; the PDF is the deliverable
     return pdf
 
 

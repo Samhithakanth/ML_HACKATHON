@@ -1,12 +1,12 @@
 """
-report/capture_ui_screenshots.py
+docs/report_sources/capture_ui_screenshots.py
 
 Drives the REAL web UI (served by the running API at /web/) in headless Microsoft Edge through the Chrome DevTools
 Protocol and saves screenshots for the report: connection, trip selection, and the result view for chosen trips.
 Also screenshots two raw API responses (/health, /trips) as rendered by the browser.
 
     1) start the API:  uvicorn api.main:app --host 0.0.0.0 --port 8000      (set DATA_DIR / EVAL_PARTITION for the evaluation trips)
-    2) python report/capture_ui_screenshots.py http://<laptop-1-ip>:8000     -> report/screenshots/*.png
+    2) python docs/report_sources/capture_ui_screenshots.py http://<laptop-1-ip>:8000     -> docs/report_sources/screenshots/*.png
 Nothing is mocked: every screenshot is taken after the UI has really called the API.
 """
 from __future__ import annotations

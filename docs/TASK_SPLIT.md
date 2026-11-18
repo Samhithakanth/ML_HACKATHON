@@ -32,7 +32,7 @@ P4 starts in parallel with a stub predictor. Freeze the file formats early.
    (clean-trip miss rate 0.65% train / 0.09% student-test).
 6. Handoff parquet tables (regenerate with `python -m src.data.build_dataset`), EDA plots, Folium maps, notebook.
 
-**Also done:** report Section 2.2 draft (`report/REPORT_SECTION_2_2_EDA.md`, AI-assisted from the real results: the team must review it and disclose AI assistance) and Folium map screenshots (`results/maps/screenshots/`).
+**Also done:** report Section 2.2 draft (`docs/report_sources/REPORT_SECTION_2_2_EDA.md`, AI-assisted from the real results: the team must review it and disclose AI assistance) and Folium map screenshots (`results/maps/screenshots/`).
 **Remaining for P1:** read and verify the Section 2.2 draft against the repo; optionally add unit tests for labels/candidates.
 
 **Viva topics:** projection choice, label derivation, candidate radius/K, suspect trips, leakage handling.
