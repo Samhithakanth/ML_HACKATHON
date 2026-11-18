@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PathSnap | Distributed Map-Matching & Route Reconstruction</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.2" fill="none">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>PathSnap <span>Evaluator</span></h1>
+          <span class="subtitle">Distributed Map-Matching & Sequential Route Reconstruction</span>
+        </div>
+      </div>
+
+      <!-- LAN / Hotspot Connection Config -->
+      <div class="api-config-bar">
+        <div class="input-group">
+          <label for="apiBaseUrl">API Base URL:</label>
+          <div class="input-wrapper">
+            <input type="text" id="apiBaseUrl" placeholder="http://192.168.x.x:8000" spellcheck="false" />
+            <button id="btnTestConn" title="Test API reachability and CORS">
+              <span class="btn-text">Test Ping</span>
+              <span class="spinner-sm hidden"></span>
+            </button>
+          </div>
+        </div>
+        
+        <div class="status-badge disconnected" id="connBadge">
+          <span class="status-dot"></span>
+          <span class="status-text">Disconnected</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="main-workspace">
+      <!-- Sidebar Controls -->
+      <aside class="sidebar">
+        <!-- Trip Selector Card -->
+        <div class="card trip-card">
+          <div class="card-header">
+            <h2>Select Evaluation Trip</h2>
+            <span class="badge" id="tripCountBadge">10 Trips</span>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label for="tripSelect">Evaluation Trip ID:</label>
+              <select id="tripSelect" disabled>
+                <option value="">Connecting to API...</option>
+              </select>
+            </div>
+            
+            <div class="trip-meta" id="tripMeta" style="display: none;">
+              <div class="meta-item">
+                <span class="meta-label">GPS Observations:</span>
+                <span class="meta-val" id="metaGpsPoints">-</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Duration:</span>
+                <span class="meta-val" id="metaDuration">-</span>
+              </div>
+            </div>
+
+            <!-- Road Network Buffer -->
+            <div class="form-group" style="margin-top: 14px;">
+              <div class="label-with-val">
+                <label for="networkBuffer">Road Network Buffer:</label>
+                <span id="bufferVal">150 m</span>
+              </div>
+              <input type="range" id="networkBuffer" min="50" max="500" step="25" value="150" />
+            </div>
+
+            <button id="btnRunPredict" class="btn-primary" disabled>
+              <span class="btn-text">Run Map-Matching</span>
+              <div class="spinner hidden" id="predictSpinner"></div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Layer Controls Card -->
+        <div class="card layer-card">
+          <div class="card-header">
+            <h2>Map Layers</h2>
+            <span class="info-tag">Toggle</span>
+          </div>
+          <div class="card-body layers-list">
+            <label class="layer-toggle">
+              <input type="checkbox" id="layerRawGps" checked />
+              <span class="toggle-slider"></span>
+              <span class="layer-indicator blue-dot"></span>
+              <span class="layer-name">Raw GPS Points (Track)</span>
+            </label>
+
+            <label class="layer-toggle">
+              <input type="checkbox" id="layerNetwork" checked />
+              <span class="toggle-slider"></span>
+              <span class="layer-indicator grey-line"></span>
+              <span class="layer-name">Road Network Arcs</span>
+            </label>
+
+            <label class="layer-toggle">
+              <input type="checkbox" id="layerHmm" checked />
+              <span class="toggle-slider"></span>
+              <span class="layer-indicator green-line"></span>
+              <span class="layer-name">HMM Predicted Route</span>
+            </label>
+
+            <label class="layer-toggle">
+              <input type="checkbox" id="layerClassifier" checked />
+              <span class="toggle-slider"></span>
+              <span class="layer-indicator red-dashed"></span>
+              <span class="layer-name">Classifier-Only Route</span>
+            </label>
+
+            <label class="layer-toggle">
+              <input type="checkbox" id="layerPointAccuracy" checked />
+              <span class="toggle-slider"></span>
+              <span class="layer-indicator split-dot"></span>
+              <span class="layer-name">Point Accuracy (Green/Red)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- System & Demo Guide Card -->
+        <div class="card info-card">
+          <div class="card-header">
+            <h2>Network & Demo Info</h2>
+          </div>
+          <div class="card-body text-xs">
+            <p><strong>Laptop 1 (Backend):</strong> FastAPI <code>:8000</code></p>
+            <p><strong>Laptop 2 (UI):</strong> Leaflet evaluator interface</p>
+            <p><strong>Format:</strong> Strictly <code>[lat, lon]</code> Leaflet order</p>
+            <p><strong>Ground Truth:</strong> Kept server-side; metrics & correctness verified via API</p>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center Map Area -->
+      <main class="map-section">
+        <div id="map"></div>
+
+        <!-- Floating Map Legend -->
+        <div class="map-legend">
+          <h4>Map Legend</h4>
+          <div class="legend-item">
+            <span class="legend-symbol blue-circle"></span>
+            <span>Raw GPS Observation</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-symbol grey-bar"></span>
+            <span>Road Network Arc (from /network)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-symbol green-bar"></span>
+            <span>HMM Route (Viterbi Optimal)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-symbol red-dashed-bar"></span>
+            <span>Classifier-Only (No HMM)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-symbol green-circle"></span>
+            <span>Correctly Matched Observation</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-symbol red-circle"></span>
+            <span>Mismatched Observation</span>
+          </div>
+        </div>
+
+        <!-- Alerts & Warnings Box -->
+        <div class="alerts-container" id="alertsContainer" style="display: none;">
+          <div class="alert-box" id="alertBox">
+            <div class="alert-icon" id="alertIcon">⚠️</div>
+            <div class="alert-content">
+              <h5 id="alertTitle">Notice</h5>
+              <div id="alertMessages"></div>
+            </div>
+            <button class="alert-close" id="btnAlertClose">&times;</button>
+          </div>
+        </div>
+
+        <!-- Results & Metrics Drawer -->
+        <section class="results-drawer" id="resultsDrawer" style="display: none;">
+          <div class="drawer-header">
+            <div class="drawer-title">
+              <h3>Evaluation Metrics & Pipeline Results</h3>
+              <span class="badge success" id="resTripBadge">Trip 00000007</span>
+            </div>
+            <div class="drawer-meta" id="drawerMeta">
+              <span>Latency: <strong id="resLatency">-</strong></span>
+            </div>
+          </div>
+
+          <div class="metrics-grid">
+            <!-- Pointwise Top-1 Accuracy -->
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-title">Observation Top-1 Accuracy</span>
+                <span class="delta-badge positive" id="accDelta">+12.8%</span>
+              </div>
+              <div class="metric-values">
+                <div class="val-block primary">
+                  <span class="val-label">HMM + Viterbi</span>
+                  <span class="val-number" id="hmmAcc">94.2%</span>
+                </div>
+                <div class="val-divider"></div>
+                <div class="val-block secondary">
+                  <span class="val-label">Classifier-Only</span>
+                  <span class="val-number" id="clfAcc">81.4%</span>
+                </div>
+              </div>
+              <div class="metric-footer">Correct road arc assignment per GPS observation</div>
+            </div>
+
+            <!-- Route Continuity -->
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-title">Route Continuity</span>
+                <span class="delta-badge positive" id="contDelta">+26.4%</span>
+              </div>
+              <div class="metric-values">
+                <div class="val-block primary">
+                  <span class="val-label">HMM + Viterbi</span>
+                  <span class="val-number" id="hmmCont">99.0%</span>
+                </div>
+                <div class="val-divider"></div>
+                <div class="val-block secondary">
+                  <span class="val-label">Classifier-Only</span>
+                  <span class="val-number" id="clfCont">72.6%</span>
+                </div>
+              </div>
+              <div class="metric-footer">Topological connectivity across transitions</div>
+            </div>
+
+            <!-- Macro F1 -->
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-title">Macro F1-Score</span>
+                <span class="delta-badge positive" id="f1Delta">+0.14</span>
+              </div>
+              <div class="metric-values">
+                <div class="val-block primary">
+                  <span class="val-label">HMM + Viterbi</span>
+                  <span class="val-number" id="hmmF1">0.925</span>
+                </div>
+                <div class="val-divider"></div>
+                <div class="val-block secondary">
+                  <span class="val-label">Classifier-Only</span>
+                  <span class="val-number" id="clfF1">0.781</span>
+                </div>
+              </div>
+              <div class="metric-footer">Harmonic mean of precision & recall</div>
+            </div>
+
+            <!-- Route Breaks -->
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-title">Disconnected Breaks</span>
+                <span class="delta-badge neutral" id="breaksBadge">1 break</span>
+              </div>
+              <div class="metric-values">
+                <div class="val-block primary">
+                  <span class="val-label">HMM Breaks</span>
+                  <span class="val-number" id="hmmBreaks">1</span>
+                </div>
+                <div class="val-divider"></div>
+                <div class="val-block secondary">
+                  <span class="val-label">Total Arcs</span>
+                  <span class="val-number" id="resTotalArcs">123</span>
+                </div>
+              </div>
+              <div class="metric-footer">Disconnected jumps across trajectory</div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="app.js"></script>
+</body>
+</html>
