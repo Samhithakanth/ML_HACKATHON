@@ -15,7 +15,7 @@ Every number in this file is read from a CSV in `results/` produced by the scrip
 **Problem framing.** For every GPS point we generate candidate arcs (all arcs within 100 m, at most the 30 nearest;
 P1's train-only sweep). Each (point, candidate) pair is a binary example: is this candidate the reference arc of the point?
 The reference arc comes from P1's monotone dynamic-programming alignment of the GPS sequence to `.route`.
-Clean train has 183,260 points and 2,972,785 candidate rows (6.2 % positive); student_test has 19,160 points and 366,311 rows.
+Clean train has 183,260 points and 2,972,785 candidate rows (6.1 % positive); student_test has 19,160 points and 366,311 rows (5.2 % positive).
 A classifier scores the candidates; "classifier-only" picks the best-scoring candidate per point; the HMM (Section 5)
 decodes a connected sequence from the same scores.
 
@@ -78,7 +78,7 @@ measured on the full student-test candidate set (366,311 rows) on one laptop (22
 
 All numbers are student-test unless marked CV. "Train-fit top-1" is measured on 40 sampled training points per
 training trip of each fold (`cv_train_top1_mean`); comparing it with CV top-1 is our over/underfitting evidence.
-Candidate-level positives are 6.2 % of rows, so recall/precision refer to the positive class (the true arc).
+Candidate-level positives are 6.1 % of train rows (5.2 % of student-test rows), so recall/precision refer to the positive class (the true arc).
 
 #### 3.2.1 Logistic Regression (linear)
 * **Why suitable.** A calibrated linear baseline: most of the signal is monotone in a few features (closer, better aligned,

@@ -177,7 +177,9 @@ python -m src.hmm.break_analysis        #    remaining continuity breaks: multi-
 python -m src.models.timing             #    idle-machine inference benchmark -> results/inference_timing.csv
 python -m api.benchmark                 #    end-to-end API latency per trip -> results/api_latency.csv
 python -m src.viz.make_report_maps      # 7. Folium maps for the report -> results/maps/
-pytest tests/                           # 8. API contract tests on all 10 student-test trips
+python notebooks/make_models_nb.py      # 8. builds + executes notebooks/02_models.ipynb (walk-through of all P2/P3 results)
+pytest tests/test_models_hmm.py         # 9. unit tests: metrics, features, HMM decoder on synthetic networks (no data needed)
+pytest tests/test_api.py                # 10. API contract tests on all 10 student-test trips (needs: pip install httpx2)
 ```
 
 Seeds are fixed (`SEED = 42`); trips 33 and 54 (label-suspect, see `person1/docs/DATA_NOTES.md`) are excluded from training
@@ -191,6 +193,8 @@ Logs of every run are in `results/logs/`.
 | Bayesian optimisation | `src/tuning/bayes_opt.py` | `results/tuning/optuna_trials.csv`, `best_params.json`, `untuned_vs_tuned.csv` |
 | HMM / Viterbi | `src/hmm/decoder.py`, `src/hmm/evaluate.py` | `configs/hmm.yaml`, `results/hmm/*.csv`, `results/figures/hmm_*.png` |
 | Metrics (shared with API) | `src/eval/metrics.py` | |
+| Notebook | `notebooks/make_models_nb.py` | `notebooks/02_models.ipynb` (executed, outputs stored) |
+| Tests | `tests/test_models_hmm.py` | 10 unit tests |
 
 ## 7. Results (student-test, 10 trips, 19,160 GPS points)
 
