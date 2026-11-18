@@ -31,9 +31,12 @@ def build_route_polylines(
     last_node = None
     unique_arcs = set()
 
+    prev_arc = None
     for i, arc_id in enumerate(arcs_seq):
-        if arc_id < 0 or arc_id >= len(arcs):   # -1 = point without candidates
-            last_node = None
+        if arc_id < 0 or arc_id >= len(arcs):   # -1 = point without candidates: end the current piece
+            if len(curr_path) >= 2:
+                paths.append(curr_path)
+            curr_path, last_node, prev_arc = [], None, None
             continue
         unique_arcs.add(arc_id)
         u, v = int(arcs[arc_id, 0]), int(arcs[arc_id, 1])
@@ -43,6 +46,11 @@ def build_route_polylines(
         if timestamps is not None and i > 0 and i < len(timestamps):
             if timestamps[i] - timestamps[i - 1] > gap_threshold:
                 has_gap = True
+
+        # Several consecutive GPS points on the same arc: the arc is already drawn
+        if arc_id == prev_arc and not has_gap:
+            continue
+        prev_arc = arc_id
 
         # Check topological break
         is_break = (last_node is not None and last_node != u) or has_gap
